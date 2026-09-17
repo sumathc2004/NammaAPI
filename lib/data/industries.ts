@@ -1,6 +1,8 @@
 export type Industry = {
   id: string;
   name: string;
+  /** Short product/service tagline shown under the name in compact card views (e.g. the marquee). */
+  tagline?: string;
   audience: string;
   description: string;
   useCases: string[];
@@ -26,9 +28,9 @@ export const industries: Industry[] = [
   {
     id: "travel",
     name: "Travel",
+    tagline: "Ticket Payment API",
     audience: "For Travel Businesses",
-    description:
-      "Manage customer refunds, vendor settlements and agent commissions alongside inbound payment collection.",
+    description: "API-based payment solutions for travel platforms and ticket booking systems.",
     useCases: [
       "Customer refunds",
       "Vendor payments",
@@ -97,6 +99,19 @@ export const industries: Industry[] = [
       "Marketplace workflows",
       "Payment collection",
       "Webhooks",
+    ],
+  },
+  {
+    id: "grocery",
+    name: "Grocery",
+    tagline: "QR & API Payments",
+    audience: "For Grocery Stores & Retail Businesses",
+    description: "Payment solutions for grocery stores and retail businesses using QR and API integration.",
+    useCases: [
+      "QR code collections",
+      "Retail vendor payments",
+      "Bulk payouts",
+      "Reconciliation",
     ],
   },
 ];

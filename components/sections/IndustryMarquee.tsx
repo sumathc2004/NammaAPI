@@ -40,12 +40,24 @@ const icons: Record<string, MarqueeItem["icon"]> = {
       strokeLinejoin="round"
     />
   ),
+  grocery: (
+    <>
+      <path
+        d="M3 4H5L6.3 13.4C6.5 14.9 7.8 16 9.3 16H17.3C18.7 16 19.9 15 20.2 13.6L21.5 7.5H6.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="9.5" cy="20" r="1.3" />
+      <circle cx="17" cy="20" r="1.3" />
+    </>
+  ),
 };
 
 export function IndustryMarquee({ dark = false, bare = false }: { dark?: boolean; bare?: boolean }) {
   const items: MarqueeItem[] = industries.map((industry) => ({
     id: industry.id,
     label: industry.name,
+    tagline: industry.tagline,
     description: industry.description,
     tags: industry.useCases.slice(0, 3),
     href: `/solutions#${industry.id}`,

@@ -5,6 +5,8 @@ import { cn } from "@/lib/cn";
 export type MarqueeItem = {
   id: string;
   label: string;
+  /** Short product/service line shown under the label, e.g. "Ticket Payment API". */
+  tagline?: string;
   description: string;
   tags?: string[];
   href: string;
@@ -81,6 +83,9 @@ export function Marquee({ items, eyebrow, dark = false, reverse = false, bare = 
             </div>
             <div className="flex flex-1 flex-col p-6">
               <p className={dark ? "text-lg font-semibold text-white" : "text-lg font-semibold text-text-primary"}>{item.label}</p>
+              {item.tagline && (
+                <p className={cn("mt-0.5 text-sm font-medium", dark ? "text-brand-accent" : "text-brand-primary")}>{item.tagline}</p>
+              )}
               <p className={cn("mt-2 line-clamp-3 text-sm leading-relaxed", dark ? "text-white/65" : "text-text-secondary")}>
                 {item.description}
               </p>
