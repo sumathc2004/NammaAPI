@@ -32,6 +32,7 @@ type FormState = {
   monthlyVolume: string;
   requiredServices: string[];
   message: string;
+  website: string; // honeypot — must stay empty
 };
 
 const initialState: FormState = {
@@ -43,12 +44,15 @@ const initialState: FormState = {
   monthlyVolume: "",
   requiredServices: [],
   message: "",
+  website: "",
 };
 
 export function ContactForm() {
   const [form, setForm] = useState<FormState>(initialState);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function validate(): boolean {
     const next: Partial<Record<keyof FormState, string>> = {};
@@ -71,11 +75,30 @@ export function ContactForm() {
     }));
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setSubmitError(null);
     if (!validate()) return;
-    // This form does not yet submit to a backend — see Phase 2 (ASP.NET Core API).
-    setSubmitted(true);
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Something went wrong. Please try again.");
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -88,10 +111,16 @@ export function ContactForm() {
         </div>
         <h2 className="mt-4 text-xl font-bold text-text-primary">Thanks — we&apos;ve received your message</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">
-          A member of our payments team will get back to you shortly. This form currently runs in demo mode and
-          does not yet submit to a live backend.
+          A member of our payments team will get back to you shortly.
         </p>
-        <Button variant="secondary" className="mt-6" onClick={() => setSubmitted(false)}>
+        <Button
+          variant="secondary"
+          className="mt-6"
+          onClick={() => {
+            setForm(initialState);
+            setSubmitted(false);
+          }}
+        >
           Submit another response
         </Button>
       </div>
@@ -100,6 +129,20 @@ export function ContactForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      {/* Honeypot — hidden from real users, bots tend to fill every field */}
+      <div className="hidden" aria-hidden="true">
+        <label htmlFor="website">Leave this field empty</label>
+        <input
+          id="website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={form.website}
+          onChange={(e) => setForm({ ...form, website: e.target.value })}
+        />
+      </div>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <FormInput
           label="Company Name"
@@ -188,8 +231,14 @@ export function ContactForm() {
         placeholder="Tell us a bit about your business and what you're looking to build."
       />
 
-      <Button type="submit" size="lg" className="w-full sm:w-auto">
-        Talk to Our Payments Team
+      {submitError && (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {submitError}
+        </p>
+      )}
+
+      <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={submitting}>
+        {submitting ? "Sending…" : "Talk to Our Payments Team"}
       </Button>
     </form>
   );

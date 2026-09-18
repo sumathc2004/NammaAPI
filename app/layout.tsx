@@ -3,6 +3,8 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { WhatsAppButton } from "@/components/ui/WhatsAppButton";
+import { ChatWidget } from "@/components/ui/ChatWidget";
 import { SITE_NAME, SITE_URL } from "@/lib/metadata";
 
 const inter = Inter({
@@ -42,6 +44,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
         <Footer />
+        <WhatsAppButton />
+        <ChatWidget />
       </body>
     </html>
   );
