@@ -6,6 +6,7 @@ export const metadata = buildMetadata({
   title: "Create Your Business Account",
   description: "Create a NammaAPI business account to start integrating payout, payment and salary APIs.",
   path: "/signup",
+  noIndex: true,
 });
 
 export default function SignupPage() {

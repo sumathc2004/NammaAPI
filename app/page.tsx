@@ -10,7 +10,7 @@ import { SecuritySection } from "@/components/sections/SecuritySection";
 import { FinalCta } from "@/components/sections/FinalCta";
 
 export const metadata = buildMetadata({
-  title: "Business Payment APIs | Payouts, Payments & Salary Automation",
+  title: "Business Payment APIs — Payouts, Payments & Salary Automation",
   description:
     "Automate business payouts, payment collection, salary processing and bulk payments with secure APIs and modern payment infrastructure.",
   path: "/",

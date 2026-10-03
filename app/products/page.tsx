@@ -5,7 +5,7 @@ import { FinalCta } from "@/components/sections/FinalCta";
 import { products } from "@/lib/data/products";
 
 export const metadata = buildMetadata({
-  title: "Products | Payout, Payment, Salary & Automation APIs",
+  title: "Products — Payout, Payment, Salary & Automation APIs",
   description:
     "Explore NammaAPI's payment infrastructure products: Payout API, Payment Gateway, Salary & Bulk Payments and Payment Automation.",
   path: "/products",

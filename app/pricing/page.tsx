@@ -7,7 +7,7 @@ import { pricingPlans, pricingFactors } from "@/lib/data/pricing";
 import { cn } from "@/lib/cn";
 
 export const metadata = buildMetadata({
-  title: "Pricing | Business Payment API Plans",
+  title: "Pricing — Business Payment API Plans",
   description:
     "Starter, Growth and Enterprise plans for NammaAPI's payout, payment collection and salary processing APIs.",
   path: "/pricing",

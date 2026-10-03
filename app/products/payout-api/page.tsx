@@ -9,7 +9,7 @@ import { getProduct } from "@/lib/data/products";
 const product = getProduct("payout-api")!;
 
 export const metadata = buildMetadata({
-  title: "Payout API | Automate Business Payouts",
+  title: "Payout API — Automate Business Payouts",
   description:
     "Automate payments to employees, vendors, customers and business partners with the NammaAPI Payout API.",
   path: "/products/payout-api",

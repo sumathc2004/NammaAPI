@@ -9,7 +9,7 @@ import { getProduct } from "@/lib/data/products";
 const product = getProduct("automation")!;
 
 export const metadata = buildMetadata({
-  title: "Payment Automation | Automated Financial Workflows",
+  title: "Payment Automation — Automated Financial Workflows",
   description: "Build automated financial workflows using APIs and webhooks with NammaAPI.",
   path: "/products/automation",
 });

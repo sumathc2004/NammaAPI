@@ -5,7 +5,7 @@ import { CodeBlock } from "@/components/ui/CodeBlock";
 import { apiEndpoints, docsStubSections } from "@/lib/data/apiEndpoints";
 
 export const metadata = buildMetadata({
-  title: "API Documentation | Developers",
+  title: "API Documentation — Developers",
   description:
     "Reference documentation for the NammaAPI Payout, Payment, Beneficiary, Transaction Status and Webhook APIs, with cURL, C#, JavaScript and Python examples.",
   path: "/developers",

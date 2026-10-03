@@ -9,7 +9,7 @@ import { getProduct } from "@/lib/data/products";
 const product = getProduct("payment-gateway")!;
 
 export const metadata = buildMetadata({
-  title: "Payment Gateway / Collection API | Collect Payments With APIs",
+  title: "Payment Gateway / Collection API — Collect Payments With APIs",
   description: "Integrate payment collection into your business workflows with the NammaAPI Payment Gateway.",
   path: "/products/payment-gateway",
 });

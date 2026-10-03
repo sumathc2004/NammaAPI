@@ -5,7 +5,7 @@ import { FinalCta } from "@/components/sections/FinalCta";
 import { industries } from "@/lib/data/industries";
 
 export const metadata = buildMetadata({
-  title: "Industry Solutions | Payments Built for Your Business",
+  title: "Industry Solutions — Payments Built for Your Business",
   description:
     "Payment infrastructure configured for colleges, travel businesses, insurance companies, CA firms, corporates and startups.",
   path: "/solutions",

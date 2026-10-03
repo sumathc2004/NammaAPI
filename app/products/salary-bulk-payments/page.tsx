@@ -9,7 +9,7 @@ import { getProduct } from "@/lib/data/products";
 const product = getProduct("salary-bulk-payments")!;
 
 export const metadata = buildMetadata({
-  title: "Salary & Bulk Payments | Automate Payroll & Bulk Transfers",
+  title: "Salary & Bulk Payments — Automate Payroll & Bulk Transfers",
   description: "Automate corporate salary and bulk payment processing with the NammaAPI platform.",
   path: "/products/salary-bulk-payments",
 });
