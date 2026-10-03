@@ -4,16 +4,8 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { FormInput, FormSelect } from "@/components/ui/FormInput";
 import { Button } from "@/components/ui/Button";
-
-const businessTypes = [
-  { value: "college", label: "College / Educational Institution" },
-  { value: "travel", label: "Travel Company" },
-  { value: "insurance", label: "Insurance Business" },
-  { value: "ca-firm", label: "CA Firm" },
-  { value: "corporate", label: "Corporate / Enterprise" },
-  { value: "startup", label: "Startup / Technology Platform" },
-  { value: "other", label: "Other" },
-];
+import { businessTypeOptions } from "@/lib/data/leadOptions";
+import { isValidEmail, isValidPhone } from "@/lib/validation/fields";
 
 type FormState = {
   companyName: string;
@@ -42,8 +34,8 @@ export function SignupForm() {
     e.preventDefault();
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!form.companyName.trim()) next.companyName = "Company name is required.";
-    if (!/^\S+@\S+\.\S+$/.test(form.businessEmail)) next.businessEmail = "Enter a valid business email.";
-    if (!/^[0-9+\-\s]{7,15}$/.test(form.phoneNumber)) next.phoneNumber = "Enter a valid phone number.";
+    if (!isValidEmail(form.businessEmail.trim())) next.businessEmail = "Enter a valid business email.";
+    if (!isValidPhone(form.phoneNumber.trim())) next.phoneNumber = "Enter a valid phone number.";
     if (form.password.length < 8) next.password = "Password must be at least 8 characters.";
     if (!form.businessType) next.businessType = "Please select a business type.";
     if (!form.acceptTerms) next.acceptTerms = "You must accept the Terms & Conditions.";
@@ -56,6 +48,7 @@ export function SignupForm() {
       <FormInput
         label="Company Name"
         required
+        autoComplete="organization"
         value={form.companyName}
         onChange={(e) => setForm({ ...form, companyName: e.target.value })}
         error={errors.companyName}
@@ -75,6 +68,7 @@ export function SignupForm() {
         label="Phone Number"
         type="tel"
         required
+        autoComplete="tel"
         value={form.phoneNumber}
         onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
         error={errors.phoneNumber}
@@ -94,7 +88,7 @@ export function SignupForm() {
       <FormSelect
         label="Business Type"
         required
-        options={businessTypes}
+        options={businessTypeOptions}
         placeholder="Select business type"
         value={form.businessType}
         onChange={(e) => setForm({ ...form, businessType: e.target.value })}
