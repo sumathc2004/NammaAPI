@@ -5,7 +5,12 @@ import { setSessionCredentials } from "@/lib/server/session";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const MAX_PASSWORD_LENGTH = 128;
-const RATE_LIMIT = { limit: 10, windowMs: 10 * 60 * 1000 };
+// Per IP. Generous in development so local testing isn't blocked; production keeps a real limit
+// against password guessing.
+const RATE_LIMIT = {
+  limit: process.env.NODE_ENV === "development" ? 1000 : 20,
+  windowMs: 10 * 60 * 1000,
+};
 
 // PROTOTYPE: this returns the OTP to the browser, which compares it in the OTP modal. Anyone can
 // read the OTP from the network tab, so this is not real verification — before real users log
@@ -40,6 +45,13 @@ export async function POST(request: Request) {
   const result = await requestAepsOtp(phone, password);
 
   if (!result.ok) {
+    if (process.env.NODE_ENV === "development" && result.reason === "invalid_credentials") {
+      // Development-only diagnostics for "Failed" logins. Never logs the password itself.
+      const spaces = password !== password.trim() ? ", has leading/trailing spaces" : "";
+      console.warn(
+        `Login rejected by AEPS for ••••••${phone.slice(-4)}: "${result.error}" (password ${password.length} chars${spaces})`,
+      );
+    }
     return NextResponse.json(
       { error: result.error },
       { status: result.reason === "invalid_credentials" ? 401 : 503 },
