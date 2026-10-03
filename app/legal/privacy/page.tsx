@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { buildMetadata } from "@/lib/metadata";
 import { LegalLayout } from "@/components/sections/LegalLayout";
 
@@ -34,9 +35,9 @@ export default function PrivacyPolicyPage() {
         <h2 className="text-base font-semibold text-text-primary">5. Contact</h2>
         <p className="mt-2">
           [Insert contact details for privacy-related inquiries.] You can also reach us through our{" "}
-          <a href="/contact" className="font-medium text-brand-primary hover:text-brand-dark">
+          <Link href="/contact" className="font-medium text-brand-primary hover:text-brand-dark">
             contact page
-          </a>
+          </Link>
           .
         </p>
       </div>

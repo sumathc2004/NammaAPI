@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { buildMetadata } from "@/lib/metadata";
 import { PageHero } from "@/components/sections/PageHero";
 import { Card } from "@/components/ui/Card";
@@ -70,9 +71,9 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold text-text-primary">Careers</h2>
           <p className="mt-4 text-text-secondary">
             [Placeholder] Open roles will be listed here. In the meantime, reach out through our{" "}
-            <a href="/contact" className="font-semibold text-brand-primary hover:text-brand-dark">
+            <Link href="/contact" className="font-semibold text-brand-primary hover:text-brand-dark">
               contact page
-            </a>{" "}
+            </Link>{" "}
             if you&apos;d like to get in touch.
           </p>
         </div>

@@ -82,7 +82,6 @@ export const footerNav = {
   ],
   developers: [
     { label: "API Documentation", href: "/developers" },
-    { label: "API Status", href: "/developers#status" },
     { label: "Security", href: "/security" },
   ],
   company: [

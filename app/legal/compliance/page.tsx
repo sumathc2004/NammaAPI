@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { buildMetadata } from "@/lib/metadata";
 import { LegalLayout } from "@/components/sections/LegalLayout";
 
@@ -14,9 +15,9 @@ export default function CompliancePage() {
         This page is a placeholder for verified regulatory, licensing and compliance information. NammaAPI does
         not claim any certification, license or regulatory approval that has not been independently verified. See
         also the{" "}
-        <a href="/security" className="font-medium text-brand-primary hover:text-brand-dark">
+        <Link href="/security" className="font-medium text-brand-primary hover:text-brand-dark">
           Security &amp; Compliance
-        </a>{" "}
+        </Link>{" "}
         product page for platform security capabilities.
       </p>
       <div>
