@@ -1,5 +1,5 @@
 import { buildMetadata } from "@/lib/metadata";
-import { SignupForm } from "@/app/signup/SignupForm";
+import { SignupForm } from "./SignupForm";
 import { Logo } from "@/components/ui/Logo";
 
 export const metadata = buildMetadata({

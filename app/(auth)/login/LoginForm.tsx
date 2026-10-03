@@ -7,7 +7,8 @@ import { FormInput } from "@/components/ui/FormInput";
 import { Button } from "@/components/ui/Button";
 import { isValidIndianMobile } from "@/lib/validation/fields";
 import { saveDemoSession, type AepsProfile } from "@/lib/auth/demoSession";
-import { OtpDialog } from "@/app/login/OtpDialog";
+import { DEFAULT_DASHBOARD_PATH } from "@/lib/data/dashboardNav";
+import { OtpDialog } from "./OtpDialog";
 
 /** PROTOTYPE: set to true to print the expected OTP (the account's defaultOTP) inside the modal. */
 const SHOW_DEMO_OTP = false;
@@ -63,7 +64,9 @@ export function LoginForm() {
   function handleVerify(otp: string): string | null {
     if (!pending || otp !== pending.otp) return "That code isn't right. Please try again.";
     saveDemoSession(pending.profile);
-    router.push("/dashboard");
+    // The server now holds the credentials in its encrypted session cookie; drop the typed password.
+    setPassword("");
+    router.push(DEFAULT_DASHBOARD_PATH);
     return null;
   }
 

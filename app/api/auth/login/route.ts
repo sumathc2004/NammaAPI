@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isValidIndianMobile, normalizeIndianMobile } from "@/lib/validation/fields";
 import { requestAepsOtp } from "@/lib/server/aepsAuth";
+import { setSessionCredentials } from "@/lib/server/session";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const MAX_PASSWORD_LENGTH = 128;
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Password is required." }, { status: 400 });
   }
 
-  const result = await requestAepsOtp(normalizeIndianMobile(rawPhone), password);
+  const phone = normalizeIndianMobile(rawPhone);
+  const result = await requestAepsOtp(phone, password);
 
   if (!result.ok) {
     return NextResponse.json(
@@ -43,6 +45,10 @@ export async function POST(request: Request) {
       { status: result.reason === "invalid_credentials" ? 401 : 503 },
     );
   }
+
+  // Keep the credentials server-side (encrypted httpOnly cookie) for later vendor calls such as
+  // the dashboard reports. The response itself never contains the password.
+  await setSessionCredentials({ userName: phone, password, isAdmin: result.profile.isAdmin === true });
 
   return NextResponse.json({ ok: true, otp: result.otp, profile: result.profile });
 }

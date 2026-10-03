@@ -17,7 +17,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 Marketing website for **NammaAPI**, a business payments API platform for Indian businesses (payouts, payment collection, salary & bulk payments, payment automation), plus a **prototype phone + OTP login** backed by an external AEPS API.
 
 - Next.js 16 (App Router, Turbopack), React 19, TypeScript (strict), Tailwind CSS v4.
-- Every page is statically prerendered. The only dynamic routes are the two API routes (`/api/contact`, `/api/auth/login`).
+- Every page is statically prerendered. The only dynamic routes are the API routes under `app/api/`.
 - No database. The contact form emails via Resend; login calls the external AEPS API.
 
 ## Commands
@@ -39,31 +39,46 @@ Copy `.env.example` to `.env.local` (git-ignored) and fill it in.
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | `lib/metadata.ts` | Absolute origin for canonical URLs, Open Graph, sitemap, robots. Falls back to Vercel's production URL, then `http://localhost:3000` (with a build warning). |
 | `RESEND_API_KEY`, `CONTACT_EMAIL_TO`, `CONTACT_EMAIL_FROM` | `app/api/contact/route.ts` | Contact form email. Without the first two the route returns 500. |
-| `AEPS_API_BASE_URL` | `lib/server/env.ts` | Base URL of the AEPS login API, e.g. `https://nammapayments.in/v5bc/api/aeps`. Required for login. |
+| `AEPS_API_BASE_URL` | `lib/server/env.ts` | Base URL of the AEPS API, e.g. `https://nammapayments.in/v5bc/api/aeps`. Required for login and dashboard reports. |
+| `AUTH_SECRET` | `lib/server/session.ts` | Encrypts the session cookie holding the account credentials. Required; at least 32 characters (`openssl rand -hex 32`); different per environment; never committed. |
 
 ## Directory map
 
 ```
 app/                      Routes (App Router)
-  layout.tsx              Root layout: fonts, Header, Footer, WhatsApp + chat widgets
-  page.tsx                Home page (composed of components/sections/*)
-  products/, solutions/, developers/, pricing/, security/, about/, contact/, legal/
-  login/                  Prototype login: LoginForm.tsx + OtpDialog.tsx (client)
-  dashboard/              Post-login page: DashboardView.tsx (client, reads sessionStorage)
-  signup/                 Signup form (UI only, not connected to a backend)
+  layout.tsx              Root layout: <html>/<body>, fonts, metadata defaults, skip link — no page chrome
+  (site)/                 Public website (route group: no URL segment)
+    layout.tsx            Website chrome: Header, Footer, WhatsApp + chat widgets, <main>
+    page.tsx              Home page (composed of components/sections/*)
+    products/, solutions/, developers/, pricing/, security/, about/, contact/, legal/
+    signup/               Signup form (UI only, not connected to a backend)
+  (auth)/                 Login (route group): layout with no navbar, footer or chat widgets
+    login/                Prototype login: LoginForm.tsx + OtpDialog.tsx (client), "Back to website" link
+  dashboard/              Logged-in app (outside (site), so no website navbar/footer)
+    layout.tsx            Wraps every page in components/dashboard/DashboardShell
+    page.tsx              Redirects to the first section (/dashboard/transfer)
+    <section>/page.tsx    One page per sidebar section (see "Dashboard")
   api/contact/route.ts    Contact form → Resend email
-  api/auth/login/route.ts Prototype login → AEPS API (see "Login prototype")
+  api/auth/login/route.ts Prototype login → AEPS API; sets the session cookie (see "Login prototype")
+  api/auth/logout/        Deletes the session cookie
+  api/dashboard/<section>/ GET report routes (see "Dashboard reports")
   error.tsx, global-error.tsx, not-found.tsx, opengraph-image.tsx, robots.ts, sitemap.ts
 components/
-  layout/                 Header (client: dropdowns, mobile menu), Footer
+  layout/                 Website Header (client: dropdowns, mobile menu), Footer
+  dashboard/              DashboardShell, DashboardSidebar, ProfileMenu, WalletBalances, SectionIcon,
+                          SectionPlaceholder, ReportView, AdminOnly, ApiBalanceView
   sections/               Page sections and cards (Hero, ProductCard, PageHero, LegalLayout, ...)
-  ui/                     Shared building blocks (Button, Card, FormInput, CodeBlock, Marquee, ...)
+  ui/                     Shared building blocks (Button, Card, FormInput, CodeBlock, Logo, Marquee, ...)
   illustrations/          SVG/markup illustrations
 lib/
-  data/                   Static content: products, industries, nav, pricing, apiEndpoints, leadOptions
+  data/                   Static content: products, industries, nav, pricing, apiEndpoints, leadOptions, dashboardNav
   validation/             Field checks shared by browser and server (fields.ts, contact.ts)
-  server/                 Server-only code (`import "server-only"`): AEPS client, env access
-  auth/demoSession.ts     Prototype login state in sessionStorage
+  server/                 Server-only code (`import "server-only"`): aepsClient (GET/POST + XML/JSON parsing),
+                          aepsAuth (login), aepsReports, aepsAdmin, reportRequest, session (encrypted cookie), env
+  admin/apiBalance.ts     Client-safe type for the admin API level balance
+  reports/                Client-safe report helpers: date ranges (dates.ts), table formatting (table.ts),
+                          fixed column layouts per section (layouts.ts)
+  auth/demoSession.ts     Profile (balances) for the dashboard UI, in sessionStorage — no credentials
   metadata.ts             buildMetadata(), SITE_NAME, SITE_URL
   rate-limit.ts           In-memory fixed-window rate limiter for API routes
   cn.ts                   className joiner (tailwind-merge)
@@ -73,7 +88,8 @@ public/                   logo.png (light backgrounds), logo-white.png (dark bac
 ## Conventions
 
 **Rendering**
-- Server Components by default. Add `"use client"` only for interactivity. Current client components: `Header`, `ChatWidget`, `CodeTabs`, `FormInput`, the contact/signup/login forms, `OtpDialog`, `DashboardView`, and the error boundaries.
+- Server Components by default. Add `"use client"` only for interactivity. Current client components: `Header`, `ChatWidget`, `CodeTabs`, `FormInput`, the contact/signup/login forms, `OtpDialog`, `DashboardShell`, `DashboardSidebar`, `ProfileMenu`, and the error boundaries.
+- Page chrome comes from layouts, not the root layout: public pages live in `app/(site)/` (website navbar and footer), the login page in `app/(auth)/` (no chrome), logged-in pages in `app/dashboard/` (dashboard shell). A new public page goes in `app/(site)/`. `app/not-found.tsx` renders outside all of them, so it adds `Header`/`Footer` itself.
 - Keep pages static. Request-time APIs (`cookies()`, `headers()`, `searchParams`) in a page or layout make it dynamic.
 - Error boundaries receive `retry` (Next 16), not `reset`.
 
@@ -106,23 +122,52 @@ public/                   logo.png (light backgrounds), logo-white.png (dark bac
 - Internal links use `next/link` (or `Button` with `href`), never a plain `<a href="/...">`.
 
 **Native `<dialog>`**
-- Open it with `showModal()` in an effect, and do not call `close()` in the effect cleanup: React's development double-mount would fire the `close` event and dismiss the dialog instantly. Close it by unmounting from the parent (see `app/login/OtpDialog.tsx`).
+- Open it with `showModal()` in an effect, and do not call `close()` in the effect cleanup: React's development double-mount would fire the `close` event and dismiss the dialog instantly. Close it by unmounting from the parent (see `app/(auth)/login/OtpDialog.tsx`).
 
 ## Login prototype (not production-safe)
 
 The login is a deliberate prototype for client demos:
 
 1. `LoginForm` posts the phone number and password to `/api/auth/login`.
-2. The route normalizes the phone number to 10 digits and calls the vendor endpoint `GET {AEPS_API_BASE_URL}/GetV2LoginInfo?UserName=<phone>&Password=<password>` (`lib/server/aepsAuth.ts`).
-3. The vendor returns XML (`AEPSController.NPLoginResponse`) with `MESSAGE` (`"Success"` on valid credentials), `Otp`, `defaultOTP` and balance fields (`Balance`, `walletBalance`, `aepsBalance`, `bbpsBalance`, `cmsBalance`). The XML parser runs with `parseTagValue: false` so codes with a leading zero stay intact.
-4. The route returns `defaultOTP` and the balances to the browser. `OtpDialog` shows one box per digit and accepts the code only if it equals `defaultOTP`.
-5. On a match the profile is stored in `sessionStorage` (`lib/auth/demoSession.ts`) and the user lands on `/dashboard`, which redirects to `/login` when no session exists.
+2. The route normalizes the phone number to 10 digits and calls the vendor endpoint `POST {AEPS_API_BASE_URL}/GetV2LoginInfo_api?UserName=<phone>&Password=<password>` — a POST, but the parameters must be in the query string (a JSON body returns 404 "No action was found"). See `lib/server/aepsAuth.ts`; all vendor calls go through `aepsRequest()` in `lib/server/aepsClient.ts`.
+3. With `Accept: application/json` the vendor returns a flat JSON object: `MESSAGE` (`"Success"` on valid credentials), `UserName`, `Otp`, `defaultOTP`, `Balance`, `walletBalance` (debit wallet), `CreditBalance` (credit wallet), `aepsBalance`, `bbpsBalance`, `cmsBalance`, `isAdmin`, and empty AEPS identity fields. All values are strings; codes can have leading zeros (e.g. `defaultOTP: "0022"`), so they are never converted to numbers. (The XML form wraps the same fields in `AEPSController.NPLoginResponse`; both are handled.)
+4. On success the route stores `{ userName, password, isAdmin }` in the `namma_session` cookie (`lib/server/session.ts`): AES-256-GCM encrypted with `AUTH_SECRET`, httpOnly, 8-hour expiry. Later vendor calls read credentials from it. The password is never sent back to the browser or stored client-side.
+5. The route returns `defaultOTP` and the balances to the browser. `OtpDialog` shows one box per digit and accepts the code only if it equals `defaultOTP`.
+6. On a match the profile (balances only) is stored in `sessionStorage` (`lib/auth/demoSession.ts`) and the user lands on the first dashboard section. `DashboardShell` redirects to `/login` when there's no profile. Log out calls `/api/auth/logout` and clears both.
 
 Known gaps — fix all of them before real users log in:
 - The expected OTP is sent to the browser, so anyone can read it in devtools; and it is the account's fixed `defaultOTP`, not the per-request `Otp`.
-- The "session" is client-side `sessionStorage`, editable by anyone. Replace it with a server-verified, httpOnly cookie session.
-- The vendor API takes the password as a GET query parameter, so it appears in this server's outbound URL. Never log that URL; ask the vendor for a POST endpoint.
-- `SHOW_DEMO_OTP` in `app/login/LoginForm.tsx` prints the expected OTP inside the modal when set to `true`.
+- The session cookie is set as soon as the vendor accepts the password, before the OTP step, and the OTP is checked only in the browser. Verify the OTP on the server and set the cookie only after it matches.
+- The dashboard's "logged in" check reads `sessionStorage`; the real authority is the session cookie (report routes return 401 without it).
+- The vendor API takes the password as a query parameter (even on the POST login endpoint), so it appears in this server's outbound URLs. Never log those URLs; ask the vendor to accept credentials in the request body.
+- `SHOW_DEMO_OTP` in `app/(auth)/login/LoginForm.tsx` prints the expected OTP inside the modal when set to `true`.
+
+## Dashboard
+
+- `DashboardShell` (client) is the frame for every `/dashboard/*` page: top navbar with the logo (links to `/dashboard`), the wallet balances and the profile button, the navy sidebar (desktop) or slide-in drawer (mobile), and the content area.
+- The desktop sidebar collapses to icons only (labels become hover tooltips) via the toggle at its bottom; the choice is remembered in `localStorage` (`namma-sidebar-collapsed`). The mobile drawer always shows labels.
+- Dashboard styling is flat and premium: navy gradient sidebar, no dot-grid textures or blurred glows.
+- `WalletBalances` (navbar, `md` and up): two segments — **Debit balance** (`walletBalance`) and **Credit balance** (`CreditBalance`), in a light brand-styled chip. Values come from the login response, so they don't update until the next login.
+- `ProfileMenu`: the profile button opens a panel with the phone number, total balance, the Debit wallet/Credit wallet/AEPS/BBPS/CMS balances and Log out. On phones this is the only place balances appear.
+- Sidebar sections are defined once in `lib/data/dashboardNav.ts` (Transfer, PG Reports, AEPS Reports, QR Reports, Wallet Ledger, Credit Ledger, Admin); each has an icon in `components/dashboard/SectionIcon.tsx` and a page at `app/dashboard/<id>/page.tsx`.
+- Sections marked `adminOnly: true` (currently **Admin**, shield icon) appear in a separate "Admin" sidebar group only when the login response has `isAdmin: true`. Their pages wrap content in `<AdminOnly>`, which sends non-admins back to the dashboard. That is UI only: `isAdmin` is also stored in the encrypted session cookie, and any admin API route must check `(await getSessionCredentials())?.isAdmin` on the server.
+- **Admin page** (`app/dashboard/admin/page.tsx` → `ApiBalanceView`): the API level balance. `GET /api/dashboard/admin/api-balance` (401 without a session, 403 if the session isn't admin) calls vendor `POST getapiLevelbalance?UserName=&Password=` (`lib/server/aepsAdmin.ts`), which returns `{ Status, StatusCode, Message, Data: { wallet, bul_0080, bul_8539, …, diff } }` with numeric values. Shown as: API wallet, BUL total (sum of every `bul_*`/other key), Difference (`diff`, with a "Matches" badge when it equals wallet − BUL total), and one card per account with its share of the BUL total. What the `bul_` prefix stands for isn't documented, so accounts are labelled "BUL 0080" etc.
+- Sections without real content render `SectionPlaceholder` (header + empty state). To add a section: add it to `dashboardSections`, give it an icon, and create its page.
+
+## Dashboard reports
+
+Sections backed by a vendor date-range endpoint (currently **Credit Ledger** → `GetWalletTransactions_swallet` and **Wallet Ledger** → `GetWalletTransactions`):
+
+1. The page renders `<ReportView section="…" />`: title, quick ranges (Today/7D/30D/90D), From/To dates (default: today), summary stats, searchable/exportable table. Below the `md` breakpoint each entry is a card instead of a table row (`planCard()`): narration (or the longest text field) as the title, date underneath, amount + Cr/Dr on the right, remaining fields as a two-column label/value list.
+2. `ReportView` calls our API: `GET /api/dashboard/<section>?fromDate=yyyy-MM-dd&toDate=yyyy-MM-dd`. No credentials are sent.
+3. `app/api/dashboard/<section>/route.ts` calls `handleReportRequest()` (`lib/server/reportRequest.ts`): rate limit, date validation (max 366 days), credentials from the session cookie (401 if missing/expired), then `fetchReport()`.
+4. `fetchReport()` (`lib/server/aepsReports.ts`) calls `GET {AEPS_API_BASE_URL}/<endpoint>?UserName=&Password=&FromDate=&ToDate=` and finds the list of records in the XML/JSON response, whatever its wrapper names. A vendor message such as "no records found" becomes an empty list; any other non-success message is returned as a 422 and logged (message and response shape only).
+5. Columns come from the vendor's field names; `lib/reports/table.ts` infers formatting (₹ amounts with credit/debit colours, dates, Cr/Dr and status badges) and hides columns that are empty in every row. The vendor's dates are .NET en-US strings (`10/3/2026 5:46:26 PM` = month/day/year); `parseDate` handles them as well as ISO and `/Date(…)/`, and shows them as `03 Oct 2026, 5:46 pm` (no time when it's exactly midnight).
+6. A section can instead have a fixed column order in `lib/reports/layouts.ts`. **Wallet Ledger** uses: Date & Time, Type, Narration, Amount, Cr/Dr, Closing Balance. Each slot lists the vendor field names it accepts; Cr/Dr is also recognised by its values; when the vendor sends a date-only field plus a second date-time (or time) field, the Date & Time cell shows the complete value once (`dateCellText` in `lib/reports/table.ts`); separate credit/debit amount fields become one Amount; Amount is coloured per row by Cr/Dr. If fewer than 3 slots match, every field is shown instead. In development the server logs each report's field names (`AEPS <endpoint> fields: …`, names only) to help adjust the patterns.
+
+To connect another section: add its endpoint to `REPORT_ENDPOINTS` in `lib/server/aepsReports.ts`, create `app/api/dashboard/<section>/route.ts` (one line: `return handleReportRequest(request, "<section>")`), and render `<ReportView section="<section>" />` on its page.
+
+Not yet confirmed with the vendor: the `FromDate`/`ToDate` format. `VENDOR_DATE_FORMAT` in `lib/server/aepsReports.ts` sends `yyyy-MM-dd`; switch it there if the vendor expects e.g. `dd/MM/yyyy`.
 
 ## Other placeholders still in the site
 

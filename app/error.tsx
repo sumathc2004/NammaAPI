@@ -9,7 +9,7 @@ export default function Error({ error, retry }: { error: Error & { digest?: stri
   }, [error]);
 
   return (
-    <section className="flex min-h-[60vh] items-center justify-center bg-brand-light px-4 py-20">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-brand-light px-4 py-20">
       <div className="max-w-lg text-center">
         <h1 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">Something went wrong</h1>
         <p className="mt-4 text-text-secondary">
@@ -23,6 +23,6 @@ export default function Error({ error, retry }: { error: Error & { digest?: stri
           </Button>
         </div>
       </div>
-    </section>
+    </main>
   );
 }

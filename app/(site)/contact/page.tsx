@@ -1,6 +1,6 @@
 import { buildMetadata } from "@/lib/metadata";
 import { PageHero } from "@/components/sections/PageHero";
-import { ContactForm } from "@/app/contact/ContactForm";
+import { ContactForm } from "./ContactForm";
 
 export const metadata = buildMetadata({
   title: "Contact Sales",

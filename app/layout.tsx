@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { WhatsAppButton } from "@/components/ui/WhatsAppButton";
-import { ChatWidget } from "@/components/ui/ChatWidget";
 import { SITE_NAME, SITE_URL } from "@/lib/metadata";
 
 const inter = Inter({
@@ -31,7 +27,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col font-sans">
         <a
           href="#main-content"
@@ -39,13 +39,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
-        <Header />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
-        <Footer />
-        <WhatsAppButton />
-        <ChatWidget />
+        {/* Each section provides its own chrome and <main id="main-content">:
+            app/(site)/layout.tsx for the public website, app/dashboard/layout.tsx after login. */}
+        {children}
       </body>
     </html>
   );

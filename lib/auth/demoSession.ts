@@ -1,15 +1,19 @@
-// PROTOTYPE login state. After the OTP matches, the logged-in profile is kept in this tab's
-// sessionStorage so the dashboard can read it. Anyone can edit sessionStorage from devtools,
-// so this is a demo convenience, not authentication — replace with a server session before
-// real users log in.
+// PROTOTYPE login state for the UI. After the OTP matches, the profile (phone number and balances,
+// never credentials) is kept in this tab's sessionStorage so the dashboard can show it. It is not
+// authentication: the real authority is the encrypted session cookie (lib/server/session.ts).
 
 export type AepsProfile = {
   userName: string;
   balance: string;
+  /** Main (debit) wallet, shown as "Debit balance" in the dashboard navbar. */
   walletBalance: string;
+  /** Credit wallet, shown as "Credit balance". Missing from sessions saved before it was added. */
+  creditBalance?: string;
   aepsBalance: string;
   bbpsBalance: string;
   cmsBalance: string;
+  /** Shows admin-only sidebar sections. UI only — admin APIs must check the session cookie instead. */
+  isAdmin?: boolean;
 };
 
 const STORAGE_KEY = "namma-demo-session";
