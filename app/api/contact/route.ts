@@ -1,44 +1,41 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { businessTypeOptions, monthlyVolumeOptions, optionLabel } from "@/lib/data/leadOptions";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { validateContact } from "@/lib/validation/contact";
 
-type ContactPayload = {
-  companyName: string;
-  businessType: string;
-  contactPerson: string;
-  businessEmail: string;
-  phoneNumber: string;
-  monthlyVolume: string;
-  requiredServices: string[];
-  message: string;
-  /** Honeypot field — real users never fill this in. */
-  website?: string;
-};
+/** Generous ceiling for a legitimate submission (the message field alone is capped at 2,000 chars). */
+const MAX_BODY_BYTES = 16 * 1024;
+/** Per-IP submission allowance. */
+const RATE_LIMIT = { limit: 5, windowMs: 10 * 60 * 1000 };
 
-function isValidPayload(body: unknown): body is ContactPayload {
-  if (!body || typeof body !== "object") return false;
-  const b = body as Record<string, unknown>;
-  return (
-    typeof b.companyName === "string" &&
-    b.companyName.trim().length > 0 &&
-    typeof b.businessType === "string" &&
-    b.businessType.trim().length > 0 &&
-    typeof b.contactPerson === "string" &&
-    b.contactPerson.trim().length > 0 &&
-    typeof b.businessEmail === "string" &&
-    /^\S+@\S+\.\S+$/.test(b.businessEmail) &&
-    typeof b.phoneNumber === "string" &&
-    /^[0-9+\-\s]{7,15}$/.test(b.phoneNumber) &&
-    typeof b.monthlyVolume === "string" &&
-    b.monthlyVolume.trim().length > 0 &&
-    Array.isArray(b.requiredServices) &&
-    typeof b.message === "string"
-  );
-}
+const SEND_FAILED = "We couldn't send your message right now. Please try again shortly.";
 
 export async function POST(request: Request) {
+  const rate = checkRateLimit(`contact:${getClientIp(request)}`, RATE_LIMIT);
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: "Too many submissions. Please wait a few minutes and try again." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+    );
+  }
+
+  if (!request.headers.get("content-type")?.includes("application/json")) {
+    return NextResponse.json({ error: "Expected a JSON request body." }, { status: 415 });
+  }
+
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (declaredLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
+  }
+
   let body: unknown;
   try {
-    body = await request.json();
+    const text = await request.text();
+    if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
+    }
+    body = JSON.parse(text);
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -49,8 +46,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (!isValidPayload(body)) {
-    return NextResponse.json({ error: "Missing or invalid fields." }, { status: 400 });
+  const result = validateContact(body);
+  if (!result.ok) {
+    return NextResponse.json({ error: "Missing or invalid fields.", fields: result.errors }, { status: 400 });
   }
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -66,7 +64,7 @@ export async function POST(request: Request) {
   }
 
   const { companyName, businessType, contactPerson, businessEmail, phoneNumber, monthlyVolume, requiredServices, message } =
-    body;
+    result.data;
 
   const resend = new Resend(apiKey);
 
@@ -78,25 +76,25 @@ export async function POST(request: Request) {
       subject: `New sales inquiry — ${companyName}`,
       text: [
         `Company: ${companyName}`,
-        `Business type: ${businessType}`,
+        `Business type: ${optionLabel(businessTypeOptions, businessType)}`,
         `Contact person: ${contactPerson}`,
         `Email: ${businessEmail}`,
         `Phone: ${phoneNumber}`,
-        `Monthly transaction volume: ${monthlyVolume}`,
+        `Monthly transaction volume: ${optionLabel(monthlyVolumeOptions, monthlyVolume)}`,
         `Required services: ${requiredServices.length > 0 ? requiredServices.join(", ") : "—"}`,
         "",
         "Message:",
-        message.trim() || "—",
+        message || "—",
       ].join("\n"),
     });
 
     if (error) {
       console.error("Resend rejected the email:", error);
-      return NextResponse.json({ error: "We couldn't send your message right now. Please try again shortly." }, { status: 502 });
+      return NextResponse.json({ error: SEND_FAILED }, { status: 502 });
     }
   } catch (err) {
     console.error("Contact form email send failed:", err);
-    return NextResponse.json({ error: "We couldn't send your message right now. Please try again shortly." }, { status: 502 });
+    return NextResponse.json({ error: SEND_FAILED }, { status: 502 });
   }
 
   return NextResponse.json({ ok: true });

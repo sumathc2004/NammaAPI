@@ -5,7 +5,7 @@ import { IndustryMarquee } from "@/components/sections/IndustryMarquee";
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-brand-gradient-radial">
-      <div className="pointer-events-none absolute inset-0 bg-dot-grid-light" />
+      <div className="pointer-events-none absolute inset-0 bg-dot-grid-light" aria-hidden="true" />
       <div
         className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-brand-accent/25 blur-3xl"
         aria-hidden="true"

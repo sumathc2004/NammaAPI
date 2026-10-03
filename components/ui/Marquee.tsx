@@ -53,73 +53,80 @@ export function Marquee({ items, eyebrow, dark = false, reverse = false, bare = 
       }}
     >
       <div className={cn("marquee-track flex w-max animate-marquee gap-7 py-1", reverse && "marquee-reverse")}>
-        {doubled.map((item, i) => (
-          <Link
-            key={`${item.id}-${i}`}
-            href={item.href}
-            className={cn(
-              "group flex w-[26rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-all duration-300",
-              dark
-                ? "border-white/15 bg-white/5 hover:border-white/35 hover:shadow-xl hover:shadow-brand-accent/10"
-                : "border-brand-border bg-white shadow-sm hover:-translate-y-1 hover:border-brand-primary/50 hover:shadow-xl hover:shadow-brand-primary/15",
-            )}
-          >
-            <div
+        {doubled.map((item, i) => {
+          // The second copy only exists to make the loop seamless — hide it from
+          // screen readers and keep it out of the tab order.
+          const isClone = i >= items.length;
+          return (
+            <Link
+              key={`${item.id}-${i}`}
+              href={item.href}
+              aria-hidden={isClone || undefined}
+              tabIndex={isClone ? -1 : undefined}
               className={cn(
-                "relative flex h-48 items-center justify-center overflow-hidden",
-                dark ? darkHeaderVariants[i % variantCount] : headerVariants[i % variantCount],
+                "group flex w-[26rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-all duration-300",
+                dark
+                  ? "border-white/15 bg-white/5 hover:border-white/35 hover:shadow-xl hover:shadow-brand-accent/10"
+                  : "border-brand-border bg-white shadow-sm hover:-translate-y-1 hover:border-brand-primary/50 hover:shadow-xl hover:shadow-brand-primary/15",
               )}
             >
-              <div className="absolute inset-0 bg-dot-grid-light opacity-50" aria-hidden="true" />
               <div
-                className="absolute h-32 w-32 rounded-full bg-white/25 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"
-                aria-hidden="true"
-              />
-              <span className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 text-white shadow-lg ring-1 ring-white/40 backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-white/30">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                  {item.icon}
-                </svg>
-              </span>
-            </div>
-            <div className="flex flex-1 flex-col p-6">
-              <p className={dark ? "text-lg font-semibold text-white" : "text-lg font-semibold text-text-primary"}>{item.label}</p>
-              {item.tagline && (
-                <p className={cn("mt-0.5 text-sm font-medium", dark ? "text-brand-accent" : "text-brand-primary")}>{item.tagline}</p>
-              )}
-              <p className={cn("mt-2 line-clamp-3 text-sm leading-relaxed", dark ? "text-white/65" : "text-text-secondary")}>
-                {item.description}
-              </p>
-
-              {item.tags && item.tags.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {item.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-xs font-medium",
-                        dark ? "border-white/15 bg-white/5 text-white/70" : "border-brand-border bg-brand-light text-text-secondary",
-                      )}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <span
                 className={cn(
-                  "mt-auto flex items-center gap-1 pt-5 text-sm font-semibold",
-                  dark ? "text-white" : "text-brand-primary",
+                  "relative flex h-48 items-center justify-center overflow-hidden",
+                  dark ? darkHeaderVariants[i % variantCount] : headerVariants[i % variantCount],
                 )}
               >
-                Explore
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true">
-                  <path d="M3 7H11M11 7L7.5 3.5M11 7L7.5 10.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-            </div>
-          </Link>
-        ))}
+                <div className="absolute inset-0 bg-dot-grid-light opacity-50" aria-hidden="true" />
+                <div
+                  className="absolute h-32 w-32 rounded-full bg-white/25 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"
+                  aria-hidden="true"
+                />
+                <span className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 text-white shadow-lg ring-1 ring-white/40 backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-white/30">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                    {item.icon}
+                  </svg>
+                </span>
+              </div>
+              <div className="flex flex-1 flex-col p-6">
+                <p className={dark ? "text-lg font-semibold text-white" : "text-lg font-semibold text-text-primary"}>{item.label}</p>
+                {item.tagline && (
+                  <p className={cn("mt-0.5 text-sm font-medium", dark ? "text-brand-accent" : "text-brand-primary")}>{item.tagline}</p>
+                )}
+                <p className={cn("mt-2 line-clamp-3 text-sm leading-relaxed", dark ? "text-white/65" : "text-text-secondary")}>
+                  {item.description}
+                </p>
+
+                {item.tags && item.tags.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {item.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-xs font-medium",
+                          dark ? "border-white/15 bg-white/5 text-white/70" : "border-brand-border bg-brand-light text-text-secondary",
+                        )}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <span
+                  className={cn(
+                    "mt-auto flex items-center gap-1 pt-5 text-sm font-semibold",
+                    dark ? "text-white" : "text-brand-primary",
+                  )}
+                >
+                  Explore
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true">
+                    <path d="M3 7H11M11 7L7.5 3.5M11 7L7.5 10.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

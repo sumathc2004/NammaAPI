@@ -1,6 +1,6 @@
 "use client";
 
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useId } from "react";
 import { cn } from "@/lib/cn";
 
@@ -8,6 +8,16 @@ const fieldClasses =
   "w-full rounded-lg border border-brand-border bg-white px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-secondary/60 transition-colors focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/15";
 
 const errorFieldClasses = "border-red-400 focus:border-red-500 focus:ring-red-500/15";
+
+const errorId = (fieldId: string) => `${fieldId}-error`;
+const hintId = (fieldId: string) => `${fieldId}-hint`;
+
+/** Points assistive tech at whichever message (error or hint) is currently rendered under the field. */
+function describedBy(fieldId: string, error?: string, hint?: string): string | undefined {
+  if (error) return errorId(fieldId);
+  if (hint) return hintId(fieldId);
+  return undefined;
+}
 
 type FieldWrapperProps = {
   label: string;
@@ -26,9 +36,13 @@ function FieldWrapper({ label, htmlFor, required, error, hint, children }: Field
         {required && <span className="text-brand-primary"> *</span>}
       </label>
       {children}
-      {hint && !error && <p className="mt-1.5 text-xs text-text-secondary">{hint}</p>}
+      {hint && !error && (
+        <p id={hintId(htmlFor)} className="mt-1.5 text-xs text-text-secondary">
+          {hint}
+        </p>
+      )}
       {error && (
-        <p role="alert" className="mt-1.5 text-xs font-medium text-red-600">
+        <p id={errorId(htmlFor)} role="alert" className="mt-1.5 text-xs font-medium text-red-600">
           {error}
         </p>
       )}
@@ -40,18 +54,20 @@ type FormInputProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   error?: string;
   hint?: string;
+  ref?: Ref<HTMLInputElement>;
 };
 
-export function FormInput({ label, error, hint, id, required, className, ...rest }: FormInputProps) {
+export function FormInput({ label, error, hint, id, required, className, ref, ...rest }: FormInputProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   return (
     <FieldWrapper label={label} htmlFor={inputId} required={required} error={error} hint={hint}>
       <input
+        ref={ref}
         id={inputId}
         required={required}
         aria-invalid={!!error}
-        aria-describedby={error ? `${inputId}-error` : undefined}
+        aria-describedby={describedBy(inputId, error, hint)}
         className={cn(fieldClasses, error && errorFieldClasses, className)}
         {...rest}
       />
@@ -74,6 +90,7 @@ export function FormTextarea({ label, error, hint, id, required, className, ...r
         id={inputId}
         required={required}
         aria-invalid={!!error}
+        aria-describedby={describedBy(inputId, error, hint)}
         rows={4}
         className={cn(fieldClasses, "resize-none", error && errorFieldClasses, className)}
         {...rest}
@@ -109,6 +126,7 @@ export function FormSelect({
         id={inputId}
         required={required}
         aria-invalid={!!error}
+        aria-describedby={describedBy(inputId, error, hint)}
         className={cn(fieldClasses, error && errorFieldClasses, className)}
         {...rest}
       >

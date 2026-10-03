@@ -14,7 +14,7 @@ export function LegalLayout({
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">{title}</h1>
         <p className="mt-2 text-sm text-text-secondary">Last updated: {lastUpdated} (placeholder)</p>
-        <div className="prose-legal mt-10 space-y-6 text-sm leading-relaxed text-text-secondary">{children}</div>
+        <div className="mt-10 space-y-6 text-sm leading-relaxed text-text-secondary">{children}</div>
       </div>
     </section>
   );
