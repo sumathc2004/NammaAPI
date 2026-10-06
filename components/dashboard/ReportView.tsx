@@ -365,7 +365,8 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   })?.id;
 
   function exportCsv() {
-    const blob = new Blob([toCsv(columns, filteredRows)], { type: "text/csv;charset=utf-8" });
+    // The byte order mark tells Excel the file is UTF-8; without it "•" and "₹" come out garbled.
+    const blob = new Blob(["﻿", toCsv(columns, filteredRows)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
