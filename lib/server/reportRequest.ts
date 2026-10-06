@@ -36,7 +36,8 @@ export async function handleReportRequest(request: Request, section: DashboardSe
 
   const result = await fetchReport(section, credentials, fromDate, toDate);
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.unavailable ? 503 : 422 });
+    const status = result.sessionExpired ? 401 : result.unavailable ? 503 : 422;
+    return NextResponse.json({ error: result.error }, { status });
   }
 
   return NextResponse.json({ ok: true, fromDate, toDate, table: result.table });

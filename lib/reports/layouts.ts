@@ -61,6 +61,38 @@ const ledgerColumns: ColumnSlot[] = [
   },
 ];
 
+// AEPS GetTxnsByDate: timestamp, transactiontype (mapped to a name server-side), adhaarnumber
+// (masked server-side), mobilenumber (the user's own — not shown), amount, userCreditAmount,
+// userCB, remarks, UTR.
+const aepsColumns: ColumnSlot[] = [
+  { id: "dateTime", label: "Date & Time", kind: "date", priority: 1, keys: [/^timestamp$/, /date|time/] },
+  { id: "type", label: "Type", kind: "text", priority: 2, keys: [/^transactiontype$/, /type/] },
+  { id: "aadhaar", label: "Aadhaar", kind: "text", priority: 3, keys: [/a+dh?a+r/], hideBelow: "lg" },
+  { id: "amount", label: "Amount", kind: "amount", priority: 4, keys: [/^amount$/] },
+  { id: "credited", label: "Credited", kind: "amount", tone: "credit", priority: 5, keys: [/^usercreditamount$/, /credit/] },
+  // What the vendor's "userCB" means isn't documented; labelled as sent.
+  { id: "userCb", label: "User CB", kind: "amount", priority: 6, keys: [/^usercb$/], hideBelow: "xl" },
+  { id: "remarks", label: "Remarks", kind: "text", priority: 7, keys: [/remark|narration|description/] },
+  { id: "utr", label: "UTR", kind: "text", priority: 8, keys: [/^utr$/, /rrn|reference/], hideBelow: "xl" },
+];
+
+// PG GetLinksByDate (card payment collections): createdDateTime, custName, card ("•••• 5968", last 4
+// digits, built server-side), DebitFromCard, Charges, amountCreditToBank, settlementType, status,
+// referenceNumber. IDs, the user's own number and always-empty fields are left out.
+const pgColumns: ColumnSlot[] = [
+  { id: "dateTime", label: "Date & Time", kind: "date", priority: 1, keys: [/^createddatetime$/, /date|time/] },
+  { id: "customer", label: "Customer", kind: "text", priority: 2, keys: [/^custname$/, /holdername|customer/] },
+  { id: "card", label: "Card", kind: "text", priority: 3, keys: [/^card$/] },
+  { id: "amount", label: "Amount", kind: "amount", priority: 4, keys: [/^debitfromcard$/] },
+  { id: "charges", label: "Charges", kind: "amount", priority: 5, keys: [/^charges$/], hideBelow: "lg" },
+  { id: "credited", label: "Credited", kind: "amount", tone: "credit", priority: 6, keys: [/^amountcredittobank$/] },
+  { id: "settlement", label: "Settlement", kind: "text", priority: 7, keys: [/^settlementtype$/], hideBelow: "xl" },
+  { id: "status", label: "Status", kind: "status", priority: 8, keys: [/^status$/] },
+  { id: "reference", label: "Reference", kind: "text", priority: 9, keys: [/^referencenumber$/], hideBelow: "xl" },
+];
+
 export const reportLayouts: Partial<Record<DashboardSectionId, ColumnSlot[]>> = {
   "wallet-ledger": ledgerColumns,
+  "aeps-reports": aepsColumns,
+  "pg-reports": pgColumns,
 };

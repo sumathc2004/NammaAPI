@@ -18,6 +18,8 @@ export type ColumnInfo = {
   extraKey?: string;
   /** Amount columns built from separate fields: `key` is the credit field, this is the debit field. */
   altKey?: string;
+  /** Hide this column in the table below this breakpoint (it stays in mobile cards, search and CSV). */
+  hideBelow?: "lg" | "xl";
 };
 
 const isZero = (value: string) => !value || Number(value.replace(/,/g, "")) === 0;
@@ -193,6 +195,10 @@ export type ColumnSlot = {
   matchEntryValues?: boolean;
   /** For dates: a separate time field to append, if the vendor splits date and time. */
   appendKeys?: RegExp[];
+  /** Fixed colour/summary role for an amount column (e.g. "credit" → green, counted in Total credit). */
+  tone?: AmountTone;
+  /** Hide this column in the table on narrower screens, so the table never needs to scroll sideways. */
+  hideBelow?: "lg" | "xl";
 };
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -248,10 +254,11 @@ export function layoutColumns(table: ReportTable, slots: ColumnSlot[], minMatche
         key: match.key,
         label: slot.label,
         kind: slot.kind,
-        tone: "neutral" as const,
+        tone: slot.tone ?? ("neutral" as const),
         ...(isMovement && toneKey && { toneKey }),
         ...(match.extraKey && { extraKey: match.extraKey }),
         ...(match.altKey && { altKey: match.altKey }),
+        ...(slot.hideBelow && { hideBelow: slot.hideBelow }),
       },
     ];
   });

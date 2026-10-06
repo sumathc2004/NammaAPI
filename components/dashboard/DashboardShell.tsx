@@ -73,8 +73,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand-light/60">
-      <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-brand-border bg-white/90 px-4 backdrop-blur sm:px-6">
+    // Exactly one screen tall: the page itself never scrolls; only the content area (and report tables) do.
+    <div className="flex h-dvh flex-col overflow-hidden bg-brand-light/60">
+      <header className="relative z-40 flex h-16 shrink-0 items-center justify-between border-b border-brand-border bg-white/90 px-4 backdrop-blur sm:px-6">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -96,12 +97,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className="flex min-h-0 flex-1">
         {/* Desktop sidebar */}
         <aside
           className={cn(
-            "sticky top-16 hidden h-[calc(100vh-4rem)] shrink-0 overflow-hidden transition-[width] duration-300 lg:block",
-            collapsed ? "w-20" : "w-64",
+            "hidden shrink-0 overflow-hidden transition-[width] duration-300 lg:block",
+            collapsed ? "w-18" : "w-64",
           )}
         >
           <DashboardSidebar collapsed={collapsed} isAdmin={profile.isAdmin} onToggleCollapse={toggleCollapsed} />
@@ -146,7 +147,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </aside>
         </div>
 
-        <main id="main-content" className="min-w-0 flex-1 px-3 py-4 sm:px-6 sm:py-8 lg:px-10">
+        <main
+          id="main-content"
+          className="scrollbar-light flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-10"
+        >
           {children}
         </main>
       </div>

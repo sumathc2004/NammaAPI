@@ -14,6 +14,11 @@ type AepsRequestOptions = {
   method?: "GET" | "POST";
   /** Response format to ask for; the vendor serves both XML and JSON. */
   prefer?: "xml" | "json";
+  /**
+   * Vendor API controller, when it isn't the one in AEPS_API_BASE_URL (".../api/aeps"):
+   * e.g. "BpPayment" calls ".../api/BpPayment/<endpoint>".
+   */
+  controller?: string;
 };
 
 const ACCEPT = {
@@ -37,9 +42,12 @@ const xmlParser = new XMLParser({
 export async function aepsRequest(
   endpoint: string,
   params: Record<string, string>,
-  { method = "GET", prefer = "xml" }: AepsRequestOptions = {},
+  { method = "GET", prefer = "xml", controller }: AepsRequestOptions = {},
 ): Promise<AepsResult> {
-  const url = new URL(`${getAepsApiBaseUrl()}/${endpoint}`);
+  const base = getAepsApiBaseUrl();
+  // Swap the last path segment (".../api/aeps") for another controller when asked.
+  const controllerBase = controller ? `${base.replace(/\/[^/]+$/, "")}/${controller}` : base;
+  const url = new URL(`${controllerBase}/${endpoint}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
   let responseText: string;
