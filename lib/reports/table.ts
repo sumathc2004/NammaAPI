@@ -19,8 +19,18 @@ export type ColumnInfo = {
   /** Amount columns built from separate fields: `key` is the credit field, this is the debit field. */
   altKey?: string;
   /** Hide this column in the table below this breakpoint (it stays in mobile cards, search and CSV). */
-  hideBelow?: "lg" | "xl";
+  hideBelow?: "lg" | "xl" | "2xl";
+  /** A second field shown under the value (e.g. IFSC under the account number); its own column in CSV. */
+  subKey?: string;
+  subLabel?: string;
+  /** "code": IDs and numbers, in monospace and never broken across lines. "words": wraps only between words. */
+  format?: TextFormat;
 };
+
+export type TextFormat = "code" | "words";
+
+/** Header text: "Account / IFSC" for a column with a second field. */
+export const columnTitle = (column: ColumnInfo) => (column.subLabel ? `${column.label} / ${column.subLabel}` : column.label);
 
 const isZero = (value: string) => !value || Number(value.replace(/,/g, "")) === 0;
 
@@ -196,11 +206,9 @@ function csvCell(column: ColumnInfo, row: ReportRow): string {
     return typeof value === "string" ? csvText(value) : csvDate(value);
   }
   const value = cellValue(column, row);
-  if (column.kind === "amount") {
-    const amount = Number(value.replace(/,/g, ""));
-    // Plain numbers with two decimals, so Excel can sum them.
-    if (value && !Number.isNaN(amount)) return amount.toFixed(2);
-  }
+  // Amounts exactly as the vendor sent them, minus thousands separators: a plain number Excel can
+  // sum, never rounded, so Excel totals match the dashboard's.
+  if (column.kind === "amount" && isNumeric(value)) return value.replace(/,/g, "");
   return csvText(value);
 }
 
@@ -217,13 +225,19 @@ function csvText(value: string): string {
 
 /**
  * CSV text for the given rows, with human-readable headers, laid out for Excel: dates as
- * yyyy-MM-dd HH:mm, amounts as plain numbers, long IDs kept as text, formulas neutralised,
+ * yyyy-MM-dd HH:mm, amounts as plain unrounded numbers, long IDs kept as text, formulas neutralised,
  * CRLF line endings. The caller adds the UTF-8 byte order mark when saving it as a file.
  */
 export function toCsv(columns: ColumnInfo[], rows: ReportRow[]): string {
   const escape = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-  const header = columns.map((c) => escape(c.label)).join(",");
-  const body = rows.map((row) => columns.map((c) => escape(csvCell(c, row))).join(","));
+  // A column with a second field (Account + IFSC) becomes two CSV columns.
+  const header = columns.flatMap((c) => (c.subLabel ? [c.label, c.subLabel] : [c.label])).map(escape).join(",");
+  const body = rows.map((row) =>
+    columns
+      .flatMap((c) => (c.subKey ? [csvCell(c, row), csvText(row[c.subKey] ?? "")] : [csvCell(c, row)]))
+      .map(escape)
+      .join(","),
+  );
   return [header, ...body].join("\r\n");
 }
 
@@ -245,7 +259,11 @@ export type ColumnSlot = {
   /** Fixed colour/summary role for an amount column (e.g. "credit" → green, counted in Total credit). */
   tone?: AmountTone;
   /** Hide this column in the table on narrower screens, so the table never needs to scroll sideways. */
-  hideBelow?: "lg" | "xl";
+  hideBelow?: "lg" | "xl" | "2xl";
+  /** A second field shown under this one (e.g. IFSC under Account), matched like `keys`. */
+  sub?: { label: string; keys: RegExp[] };
+  /** How text is set: see ColumnInfo["format"]. */
+  format?: TextFormat;
 };
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -267,7 +285,7 @@ export function layoutColumns(table: ReportTable, slots: ColumnSlot[], minMatche
     return undefined;
   };
 
-  const assigned = new Map<string, { key: string; extraKey?: string; altKey?: string }>();
+  const assigned = new Map<string, { key: string; extraKey?: string; altKey?: string; subKey?: string }>();
   for (const slot of [...slots].sort((a, b) => a.priority - b.priority)) {
     let key = findField(slot.keys, slot.exclude);
     if (!key && slot.matchEntryValues) {
@@ -277,6 +295,8 @@ export function layoutColumns(table: ReportTable, slots: ColumnSlot[], minMatche
     used.add(key);
     const extraKey = slot.appendKeys ? findField(slot.appendKeys) : undefined;
     if (extraKey) used.add(extraKey);
+    const subKey = slot.sub ? findField(slot.sub.keys) : undefined;
+    if (subKey) used.add(subKey);
 
     // Separate credit/debit amount fields (e.g. CrAmount + DrAmount) become one Amount column.
     let altKey: string | undefined;
@@ -284,7 +304,7 @@ export function layoutColumns(table: ReportTable, slots: ColumnSlot[], minMatche
       altKey = findField([/^(dr|debit)(amount|amt)?$/, /^(dr|debit).*(amount|amt)/]);
       if (altKey) used.add(altKey);
     }
-    assigned.set(slot.id, { key, extraKey, altKey });
+    assigned.set(slot.id, { key, extraKey, altKey, subKey });
   }
 
   if (assigned.size < minMatches) return null;
@@ -306,6 +326,8 @@ export function layoutColumns(table: ReportTable, slots: ColumnSlot[], minMatche
         ...(match.extraKey && { extraKey: match.extraKey }),
         ...(match.altKey && { altKey: match.altKey }),
         ...(slot.hideBelow && { hideBelow: slot.hideBelow }),
+        ...(match.subKey && slot.sub && { subKey: match.subKey, subLabel: slot.sub.label }),
+        ...(slot.format && { format: slot.format }),
       },
     ];
   });

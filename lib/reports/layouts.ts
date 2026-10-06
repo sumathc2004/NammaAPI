@@ -1,5 +1,5 @@
 import type { DashboardSectionId } from "@/lib/data/dashboardNav";
-import type { ColumnSlot } from "@/lib/reports/table";
+import type { ColumnSlot, ReportRow } from "@/lib/reports/table";
 
 // Fixed column layouts for report sections, in display order. Each slot lists the vendor field
 // names it accepts (lowercased, separators removed), most specific first. Sections without a
@@ -91,8 +91,65 @@ const pgColumns: ColumnSlot[] = [
   { id: "reference", label: "Reference", kind: "text", priority: 9, keys: [/^referencenumber$/], hideBelow: "xl" },
 ];
 
+// Transfer report (transfer/report): time, Amount, BeneficiaryAccntNumber, BeneficiaryName,
+// BeneficiaryIFSCcode, UTR, SenderMobileNumber, StoreName (always the user's own), Channel (the
+// vendor's payout partner — not shown), TxnStatus ("Refunded" set server-side), dequeue, CanRefund,
+// Remarks, UniqueTxnId.
+// IDs and numbers use format "code" (monospace, never broken mid-number); names wrap between words only.
+const transferColumns: ColumnSlot[] = [
+  { id: "dateTime", label: "Date & Time", kind: "date", priority: 1, keys: [/^time$/, /date|time/] },
+  { id: "txnId", label: "Txn ID", kind: "text", format: "code", priority: 2, keys: [/^uniquetxnid$/, /txnid/], hideBelow: "lg" },
+  { id: "sender", label: "Sender", kind: "text", format: "code", priority: 3, keys: [/^sendermobilenumber$/, /sender/], hideBelow: "2xl" },
+  { id: "beneficiary", label: "Beneficiary", kind: "text", format: "words", priority: 4, keys: [/^beneficiaryname$/, /benef.*name/] },
+  {
+    id: "account",
+    label: "Account",
+    kind: "text",
+    format: "code",
+    priority: 5,
+    keys: [/^beneficiaryaccntnumber$/, /acc(ou)?nt/],
+    sub: { label: "IFSC", keys: [/ifsc/] },
+    hideBelow: "xl",
+  },
+  { id: "amount", label: "Amount", kind: "amount", priority: 6, keys: [/^amount$/] },
+  { id: "utr", label: "UTR", kind: "text", format: "code", priority: 7, keys: [/^utr$/], hideBelow: "xl" },
+  { id: "status", label: "Status", kind: "status", priority: 8, keys: [/^txnstatus$/, /status/] },
+  { id: "remarks", label: "Remarks", kind: "text", format: "words", priority: 9, keys: [/^remarks?$/], hideBelow: "2xl" },
+];
+
 export const reportLayouts: Partial<Record<DashboardSectionId, ColumnSlot[]>> = {
+  transfer: transferColumns,
   "wallet-ledger": ledgerColumns,
   "aeps-reports": aepsColumns,
   "pg-reports": pgColumns,
+};
+
+/** A tab above a report that shows only the rows it matches (no `match` = every row). */
+export type ReportViewTab = { id: string; label: string; emptyText?: string; match?: (row: ReportRow) => boolean };
+
+const isYes = (value = "") => /^(yes|y|true|1)$/i.test(value.trim());
+
+/** Transfer statuses that mean "not processed yet". */
+const QUEUED_STATUS = /^(queued?|in ?queue|pending|initiated|processing|in ?process|on ?hold|hold)$/i;
+
+// Transfer tabs. Queue: TxnStatus "in queue" (seen live; shown as "In Queue"), plus "dequeue: true"
+// as a guess (not documented by the vendor). Refundable: CanRefund "yes" (confirmed).
+const transferViews: ReportViewTab[] = [
+  { id: "all", label: "All" },
+  {
+    id: "queue",
+    label: "Queue",
+    emptyText: "No transfers in the queue for this period.",
+    match: (row) => isYes(row.dequeue) || QUEUED_STATUS.test(row.TxnStatus ?? ""),
+  },
+  {
+    id: "refundable",
+    label: "Refundable",
+    emptyText: "No refundable transfers for this period.",
+    match: (row) => isYes(row.CanRefund),
+  },
+];
+
+export const reportViews: Partial<Record<DashboardSectionId, ReportViewTab[]>> = {
+  transfer: transferViews,
 };

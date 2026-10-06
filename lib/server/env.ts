@@ -9,6 +9,15 @@ export function getAepsApiBaseUrl(): string {
   return url.replace(/\/+$/, "");
 }
 
+/** Base URL for the vendor's client API (transfer reports), e.g. "https://nammapayments.in/apiclient/api". No trailing slash. */
+export function getClientApiBaseUrl(): string {
+  const url = process.env.CLIENT_API_BASE_URL;
+  if (!url) {
+    throw new Error("CLIENT_API_BASE_URL is not set. Add it to .env.local and your hosting provider's environment variables.");
+  }
+  return url.replace(/\/+$/, "");
+}
+
 /**
  * Key material for encrypting the session cookie (lib/server/session.ts). Required in every
  * environment; anyone who knows it can decrypt stored credentials, so never commit it.

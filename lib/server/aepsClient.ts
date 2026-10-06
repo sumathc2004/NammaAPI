@@ -1,15 +1,21 @@
 import "server-only";
 import { XMLParser } from "fast-xml-parser";
-import { getAepsApiBaseUrl } from "@/lib/server/env";
+import { getAepsApiBaseUrl, getClientApiBaseUrl } from "@/lib/server/env";
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export const AEPS_UNAVAILABLE_ERROR = "The payments service is temporarily unavailable. Please try again shortly.";
 export const AEPS_UNEXPECTED_ERROR = "The payments service returned an unexpected response. Please try again shortly.";
 
-export type AepsResult = { ok: true; body: unknown } | { ok: false; error: string };
+/** On failure, `status` is the vendor's HTTP status when it answered with an error (e.g. 401). */
+export type AepsResult = { ok: true; body: unknown } | { ok: false; error: string; status?: number };
 
 type AepsRequestOptions = {
+  /**
+   * Which vendor API: "aeps" (AEPS_API_BASE_URL, ".../v5bc/api/aeps") or "client"
+   * (CLIENT_API_BASE_URL, ".../apiclient/api", e.g. "transfer/report"). Default: "aeps".
+   */
+  api?: "aeps" | "client";
   /** The vendor's "_api" endpoints are POST, with parameters still in the query string. */
   method?: "GET" | "POST";
   /** Response format to ask for; the vendor serves both XML and JSON. */
@@ -35,16 +41,16 @@ const xmlParser = new XMLParser({
 });
 
 /**
- * Calls `{AEPS_API_BASE_URL}/{endpoint}?{params}` and parses the body (JSON or XML, whichever the
- * vendor sends). Parameters always go in the query string — including the password, for both GET
- * and POST endpoints (the vendor's design) — so never log the URL built here.
+ * Calls `{AEPS_API_BASE_URL}/{endpoint}?{params}` (or the client API's base) and parses the body
+ * (JSON or XML, whichever the vendor sends). Parameters always go in the query string — including
+ * the password, for both GET and POST endpoints (the vendor's design) — so never log the URL built here.
  */
 export async function aepsRequest(
   endpoint: string,
   params: Record<string, string>,
-  { method = "GET", prefer = "xml", controller }: AepsRequestOptions = {},
+  { api = "aeps", method = "GET", prefer = "xml", controller }: AepsRequestOptions = {},
 ): Promise<AepsResult> {
-  const base = getAepsApiBaseUrl();
+  const base = api === "client" ? getClientApiBaseUrl() : getAepsApiBaseUrl();
   // Swap the last path segment (".../api/aeps") for another controller when asked.
   const controllerBase = controller ? `${base.replace(/\/[^/]+$/, "")}/${controller}` : base;
   const url = new URL(`${controllerBase}/${endpoint}`);
@@ -63,7 +69,7 @@ export async function aepsRequest(
     contentType = response.headers.get("content-type") ?? "";
     if (!response.ok) {
       console.error(`AEPS ${endpoint} returned HTTP ${response.status}.`);
-      return { ok: false, error: AEPS_UNAVAILABLE_ERROR };
+      return { ok: false, error: AEPS_UNAVAILABLE_ERROR, status: response.status };
     }
   } catch (err) {
     console.error(`AEPS ${endpoint} request failed:`, err instanceof Error ? err.message : err);

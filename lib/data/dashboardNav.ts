@@ -4,8 +4,8 @@
 export const dashboardSections = [
   {
     id: "transfer",
-    label: "Transfer",
-    description: "Send money to beneficiaries and track the status of every transfer.",
+    label: "Transfer Reports",
+    description: "Every transfer to a beneficiary, with its status, UTR and refunds.",
   },
   {
     id: "pg-reports",
