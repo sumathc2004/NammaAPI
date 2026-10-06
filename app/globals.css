@@ -8,6 +8,7 @@
   --color-brand-accent: #1aa6d9;
   --color-brand-dark: #0a3d66;
   --color-brand-navy: #0a2647;
+  --color-brand-ink: #061a31; /* deepest navy — bottom of the dashboard sidebar gradient */
   --color-brand-light: #eff8fc;
   --color-brand-border: #d3e9f2;
   --color-text-primary: #0f2439;
@@ -113,6 +114,18 @@
   to {
     transform: translateX(-50%);
   }
+}
+
+/* Slim, nearly invisible scrollbar for dark panels (dashboard sidebar) */
+@utility scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+}
+
+/* Slim scrollbar for light scroll areas (dashboard content, report tables) */
+@utility scrollbar-light {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-brand-border) transparent;
 }
 
 .marquee-track:hover {

@@ -1,5 +1,5 @@
 import { buildMetadata } from "@/lib/metadata";
-import { SectionPlaceholder } from "@/components/dashboard/SectionPlaceholder";
+import { ReportView } from "@/components/dashboard/ReportView";
 
 export const metadata = buildMetadata({
   title: "AEPS Reports",
@@ -9,5 +9,5 @@ export const metadata = buildMetadata({
 });
 
 export default function AepsReportsPage() {
-  return <SectionPlaceholder id="aeps-reports" />;
+  return <ReportView section="aeps-reports" />;
 }

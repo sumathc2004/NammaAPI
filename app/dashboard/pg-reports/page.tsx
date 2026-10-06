@@ -1,13 +1,13 @@
 import { buildMetadata } from "@/lib/metadata";
-import { SectionPlaceholder } from "@/components/dashboard/SectionPlaceholder";
+import { ReportView } from "@/components/dashboard/ReportView";
 
 export const metadata = buildMetadata({
   title: "PG Reports",
-  description: "PG Reports in your NammaAPI dashboard.",
+  description: "Payment gateway reports in your NammaAPI dashboard.",
   path: "/dashboard/pg-reports",
   noIndex: true,
 });
 
 export default function PgReportsPage() {
-  return <SectionPlaceholder id="pg-reports" />;
+  return <ReportView section="pg-reports" />;
 }

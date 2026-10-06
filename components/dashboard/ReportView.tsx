@@ -6,6 +6,7 @@ import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { getDashboardSection, type DashboardSectionId } from "@/lib/data/dashboardNav";
 import { clearDemoSession } from "@/lib/auth/demoSession";
 import { datePresets, rangeForDays, toIsoDate, validateRange } from "@/lib/reports/dates";
+import { DatePicker } from "@/components/dashboard/DatePicker";
 import {
   amountTone,
   cellValue,
@@ -62,8 +63,20 @@ const STATUS_STYLES: Record<string, string> = {
   reversed: "bg-status-cancelled-bg text-status-cancelled",
 };
 
-/** Renders one value by column kind. `wrap` lets long text wrap (mobile cards) instead of truncating (table). */
-function Cell({ column, row, wrap = false }: { column: ColumnInfo; row: ReportRow; wrap?: boolean }) {
+/** Hides a column in the table below its breakpoint (it still appears in mobile cards, search and CSV). */
+const HIDE_BELOW: Record<NonNullable<ColumnInfo["hideBelow"]>, string> = {
+  lg: "hidden lg:table-cell",
+  xl: "hidden xl:table-cell",
+};
+
+/** Long single tokens such as reference numbers or IDs ("061026131023036730741"). */
+const isCode = (value: string) => /^[A-Za-z0-9_-]{12,}$/.test(value) && /\d/.test(value);
+
+/**
+ * Renders one value by column kind. `variant="table"` keeps rows narrow so the table never needs
+ * to scroll sideways: dates stack (date over time), text wraps, long codes use small monospace.
+ */
+function Cell({ column, row, variant = "card" }: { column: ColumnInfo; row: ReportRow; variant?: "table" | "card" }) {
   const value = cellValue(column, row);
   if (!value) return <span className="text-text-secondary/40">—</span>;
 
@@ -81,8 +94,19 @@ function Cell({ column, row, wrap = false }: { column: ColumnInfo; row: ReportRo
               : "text-text-primary";
       return <span className={cn("font-medium tabular-nums", toneClass)}>{formatAmount(value)}</span>;
     }
-    case "date":
-      return <span className="tabular-nums text-text-secondary">{dateCellText(column, row)}</span>;
+    case "date": {
+      const text = dateCellText(column, row);
+      const [day, time] = text.split(", ");
+      if (variant === "table" && time) {
+        return (
+          <span className="block whitespace-nowrap tabular-nums">
+            <span className="block text-text-primary">{day}</span>
+            <span className="block text-xs text-text-secondary">{time}</span>
+          </span>
+        );
+      }
+      return <span className="tabular-nums text-text-secondary">{text}</span>;
+    }
     case "entryType": {
       const isCredit = /^c/i.test(value);
       return (
@@ -108,10 +132,11 @@ function Cell({ column, row, wrap = false }: { column: ColumnInfo; row: ReportRo
         </span>
       );
     default:
-      return wrap ? (
-        <span className="wrap-anywhere">{value}</span>
-      ) : (
-        <span className="block max-w-88 truncate" title={value}>
+      if (variant === "table" && isCode(value)) {
+        return <span className="font-mono text-xs text-text-secondary wrap-anywhere">{value}</span>;
+      }
+      return (
+        <span className={cn("wrap-anywhere", variant === "table" && "line-clamp-2")} title={variant === "table" ? value : undefined}>
           {value}
         </span>
       );
@@ -122,70 +147,116 @@ type CardLayout = {
   title?: ColumnInfo;
   date?: ColumnInfo;
   amount?: ColumnInfo;
-  entry?: ColumnInfo;
-  rest: ColumnInfo[];
+  /** Shown beside the amount: Cr/Dr and/or status badges. */
+  badges: ColumnInfo[];
+  /** Label/value rows: label left, value right. */
+  details: ColumnInfo[];
+  /** Long IDs (references, UTRs), shown small in the card footer. */
+  codes: ColumnInfo[];
 };
 
-/** Picks which columns go where on a mobile card: title (narration), date, amount + Cr/Dr, and the rest. */
+/** Picks where each column goes on a mobile card. */
 function planCard(columns: ColumnInfo[], table: ReportTable | null): CardLayout {
+  const rows = table?.rows ?? [];
   const isBalance = (c: ColumnInfo) => /balance|\bbal\b/i.test(c.label);
   const amount =
     columns.find((c) => c.kind === "amount" && (c.toneKey || c.altKey)) ??
     columns.find((c) => c.kind === "amount" && !isBalance(c));
   const date = columns.find((c) => c.kind === "date");
-  const entry = columns.find((c) => c.kind === "entryType");
+  const badges = columns.filter((c) => c.kind === "entryType" || c.kind === "status");
 
   const textColumns = columns.filter((c) => c.kind === "text");
   const avgLength = (c: ColumnInfo) =>
-    table && table.rows.length ? table.rows.reduce((sum, row) => sum + (row[c.key]?.length ?? 0), 0) / table.rows.length : 0;
+    rows.length ? rows.reduce((sum, row) => sum + (row[c.key]?.length ?? 0), 0) / rows.length : 0;
   const title =
-    textColumns.find((c) => /narration|description|remark|particular/i.test(c.label)) ??
+    textColumns.find((c) => /narration|description|remark|particular|customer/i.test(c.label)) ??
     [...textColumns].sort((a, b) => avgLength(b) - avgLength(a))[0];
 
-  const placed = new Set([title, date, amount, entry].filter(Boolean));
-  return { title, date, amount, entry, rest: columns.filter((c) => !placed.has(c)) };
+  const isCodeColumn = (c: ColumnInfo) =>
+    c.kind === "text" && rows.some((row) => row[c.key]) && rows.every((row) => !row[c.key] || isCode(row[c.key]));
+
+  const placed = new Set([title, date, amount, ...badges].filter(Boolean));
+  const remaining = columns.filter((c) => !placed.has(c));
+  return {
+    title,
+    date,
+    amount,
+    badges,
+    details: remaining.filter((c) => !isCodeColumn(c)),
+    codes: remaining.filter(isCodeColumn),
+  };
 }
+
+/** "Reference" -> "Ref" for the compact card footer. */
+const footerLabel = (label: string) => (/^reference$/i.test(label) ? "Ref" : label);
 
 /** One report row as a card, for small screens. */
 function RowCard({ row, layout }: { row: ReportRow; layout: CardLayout }) {
-  const { title, date, amount, entry, rest } = layout;
+  const { title, date, amount, badges, details, codes } = layout;
+  const presentCodes = codes.filter((c) => row[c.key]);
+
   return (
-    <li className="rounded-xl border border-brand-border bg-white p-3.5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <li className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-sm">
+      <div className="flex items-start justify-between gap-3 px-3.5 pb-3 pt-3.5">
         <div className="min-w-0">
           {title && (
-            <p className="text-sm font-medium leading-snug text-text-primary">
-              <Cell column={title} row={row} wrap />
+            <p className="text-sm font-semibold leading-snug text-text-primary">
+              <Cell column={title} row={row} />
             </p>
           )}
           {date && (
-            <p className="mt-1 text-xs">
+            <p className="mt-0.5 text-xs">
               <Cell column={date} row={row} />
             </p>
           )}
         </div>
-        {(amount || entry) && (
-          <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+        {(amount || badges.length > 0) && (
+          <div className="flex shrink-0 flex-col items-end gap-1.5 text-right">
             {amount && (
-              <span className="text-base">
+              <span className="text-base *:font-semibold">
                 <Cell column={amount} row={row} />
               </span>
             )}
-            {entry && <Cell column={entry} row={row} />}
+            {badges.length > 0 && (
+              <span className="flex gap-1">
+                {badges.map((column) => (
+                  <Cell key={column.key} column={column} row={row} />
+                ))}
+              </span>
+            )}
           </div>
         )}
       </div>
-      {rest.length > 0 && (
-        <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-brand-border/70 pt-2.5">
-          {rest.map((column) => (
-            <div key={column.key} className={cn("min-w-0", column.kind === "amount" && "text-right")}>
-              <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">{column.label}</dt>
-              <dd className={cn("mt-0.5 text-sm text-text-primary", /balance/i.test(column.label) && "*:font-bold")}>
-                <Cell column={column} row={row} wrap />
+
+      {details.length > 0 && (
+        <dl className="space-y-1.5 border-t border-brand-border/70 px-3.5 py-2.5">
+          {details.map((column) => (
+            <div key={column.key} className="flex items-baseline justify-between gap-4">
+              <dt className="shrink-0 text-xs text-text-secondary">{column.label}</dt>
+              <dd
+                className={cn(
+                  "min-w-0 text-right text-sm text-text-primary",
+                  /balance/i.test(column.label) && "*:font-bold",
+                )}
+              >
+                <Cell column={column} row={row} />
               </dd>
             </div>
           ))}
         </dl>
+      )}
+
+      {presentCodes.length > 0 && (
+        <div className="space-y-0.5 border-t border-brand-border/70 bg-brand-light/40 px-3.5 py-2">
+          {presentCodes.map((column) => (
+            <p key={column.key} className="flex items-baseline gap-2 text-[11px] text-text-secondary">
+              <span className="shrink-0 font-semibold uppercase tracking-wide">{footerLabel(column.label)}</span>
+              <span className="min-w-0 truncate font-mono" title={row[column.key]}>
+                {row[column.key]}
+              </span>
+            </p>
+          ))}
+        </div>
       )}
     </li>
   );
@@ -219,8 +290,6 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
-  // Phones only: the From/To date pickers stay folded behind a "Custom" button to save space.
-  const [customOpen, setCustomOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,7 +313,6 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (validateRange(draft.from, draft.to) === null) setCustomOpen(false);
     apply(draft);
   }
 
@@ -268,12 +336,17 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   const cardLayout = useMemo(() => planCard(columns, table), [columns, table]);
 
   // Totals: one amount column split by its Cr/Dr field, or separate credit/debit columns.
+  // When there's a Status column, only successful entries count (failed/pending moved no money).
   const totals = useMemo(() => {
     if (!table) return null;
+    const statusColumn = columns.find((c) => c.kind === "status");
+    const counted = statusColumn
+      ? table.rows.filter((row) => /^success/i.test(row[statusColumn.key] ?? ""))
+      : table.rows;
     const movement = columns.find((c) => c.toneKey || c.altKey);
     if (movement) {
       const sumWhere = (tone: "credit" | "debit") =>
-        table.rows
+        counted
           .filter((row) => amountTone(movement, row) === tone)
           .reduce((total, row) => total + (Number(cellValue(movement, row).replace(/,/g, "")) || 0), 0);
       return { credit: sumWhere("credit"), debit: sumWhere("debit") };
@@ -281,8 +354,8 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     const creditColumn = columns.find((c) => c.tone === "credit");
     const debitColumn = columns.find((c) => c.tone === "debit");
     return {
-      credit: creditColumn ? sumColumn(table.rows, creditColumn.key) : null,
-      debit: debitColumn ? sumColumn(table.rows, debitColumn.key) : null,
+      credit: creditColumn ? sumColumn(counted, creditColumn.key) : null,
+      debit: debitColumn ? sumColumn(counted, debitColumn.key) : null,
     };
   }, [table, columns]);
 
@@ -310,7 +383,8 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     "h-9 rounded-lg border border-brand-border bg-white px-2.5 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/15";
 
   return (
-    <div className="space-y-3 md:space-y-4">
+    // Fills the dashboard content area; on tablet and up only the table rows scroll.
+    <div className="flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
       {/* Title + date range */}
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-center gap-3">
@@ -321,16 +395,13 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Quick date ranges" className="flex rounded-lg border border-brand-border bg-white p-0.5">
+          <div role="group" aria-label="Quick date ranges" className="flex h-9 items-center rounded-lg border border-brand-border bg-white p-0.5">
             {datePresets.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
                 aria-pressed={activePreset === preset.id}
-                onClick={() => {
-                  setCustomOpen(false);
-                  apply(rangeForDays(preset.days));
-                }}
+                onClick={() => apply(rangeForDays(preset.days))}
                 className={cn(
                   "rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors",
                   activePreset === preset.id ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
@@ -341,56 +412,25 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
             ))}
           </div>
 
-          {/* Phones: custom dates fold away behind this button */}
-          <button
-            type="button"
-            onClick={() => setCustomOpen((open) => !open)}
-            aria-expanded={customOpen}
-            aria-controls={`${section}-range`}
-            className={cn(
-              "inline-flex h-8.5 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors md:hidden",
-              customOpen || !activePreset
-                ? "border-brand-primary bg-brand-light text-brand-primary"
-                : "border-brand-border bg-white text-text-secondary",
-            )}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3.5" y="5" width="17" height="15" rx="2" />
-              <path d="M3.5 10h17M8 3v4M16 3v4" />
-            </svg>
-            {activePreset ? "Custom" : `${formatDate(range.from)} – ${formatDate(range.to)}`}
-          </button>
-
-          <form
-            id={`${section}-range`}
-            onSubmit={handleSubmit}
-            className={cn("w-full items-center gap-1.5 md:flex md:w-auto", customOpen ? "flex" : "hidden")}
-          >
-            <label htmlFor={`${section}-from`} className="sr-only">
-              From date
-            </label>
-            <input
-              id={`${section}-from`}
-              type="date"
+          <form onSubmit={handleSubmit} className="flex w-full items-center gap-1.5 md:w-auto">
+            <DatePicker
+              label="From"
               value={draft.from}
-              max={draft.to || today}
-              onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
-              className={cn(inputClasses, "min-w-0 flex-1 md:flex-none")}
+              max={draft.to}
+              onChange={(from) => setDraft((d) => ({ ...d, from }))}
+              className="min-w-0 flex-1 md:w-52 md:flex-none"
             />
             <span className="text-sm text-text-secondary" aria-hidden="true">
               →
             </span>
-            <label htmlFor={`${section}-to`} className="sr-only">
-              To date
-            </label>
-            <input
-              id={`${section}-to`}
-              type="date"
+            <DatePicker
+              label="To"
               value={draft.to}
               min={draft.from}
               max={today}
-              onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
-              className={cn(inputClasses, "min-w-0 flex-1 md:flex-none")}
+              align="right"
+              onChange={(to) => setDraft((d) => ({ ...d, to }))}
+              className="min-w-0 flex-1 md:w-52 md:flex-none"
             />
             <button
               type="submit"
@@ -445,8 +485,8 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
       {/* Table */}
       {/* Phones: no box around the list, so cards use the full width */}
-      <div className="md:overflow-hidden md:rounded-2xl md:border md:border-brand-border md:bg-white md:shadow-sm">
-        <div className="flex items-center gap-2 md:justify-between md:border-b md:border-brand-border md:px-3 md:py-2.5">
+      <div className="md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden md:rounded-2xl md:border md:border-brand-border md:bg-white md:shadow-sm">
+        <div className="flex shrink-0 items-center gap-2 md:justify-between md:border-b md:border-brand-border md:px-3 md:py-2.5">
           <div className="relative min-w-0 flex-1 md:w-72 md:flex-none">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
@@ -543,7 +583,7 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
         {/* Tablet and up: table */}
         {table && filteredRows.length > 0 && (
-          <div className="hidden max-h-[calc(100vh-19rem)] min-h-64 overflow-auto md:block">
+          <div className="scrollbar-light hidden min-h-40 overflow-auto md:block md:flex-1">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">
                 {label}, {range.from} to {range.to}
@@ -555,8 +595,9 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                       key={column.key}
                       scope="col"
                       className={cn(
-                        "whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary",
+                        "whitespace-nowrap px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary",
                         column.kind === "amount" && "text-right",
+                        column.hideBelow && HIDE_BELOW[column.hideBelow],
                       )}
                     >
                       {column.label}
@@ -570,9 +611,14 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                     {columns.map((column) => (
                       <td
                         key={column.key}
-                        className={cn("whitespace-nowrap px-4 py-2.5 text-text-primary", column.kind === "amount" && "text-right")}
+                        className={cn(
+                          "px-3 py-2.5 align-middle text-text-primary",
+                          column.kind === "amount" && "whitespace-nowrap text-right",
+                          (column.kind === "status" || column.kind === "entryType") && "whitespace-nowrap",
+                          column.hideBelow && HIDE_BELOW[column.hideBelow],
+                        )}
                       >
-                        <Cell column={column} row={row} />
+                        <Cell column={column} row={row} variant="table" />
                       </td>
                     ))}
                   </tr>
@@ -583,7 +629,7 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
         )}
 
         {table && pageCount > 1 && (
-          <div className="flex items-center justify-between px-4 py-2.5 text-xs text-text-secondary mt-3 rounded-xl border border-brand-border bg-white md:mt-0 md:rounded-none md:border-0 md:border-t">
+          <div className="flex shrink-0 items-center justify-between px-4 py-2.5 text-xs text-text-secondary mt-3 rounded-xl border border-brand-border bg-white md:mt-0 md:rounded-none md:border-0 md:border-t">
             <span className="tabular-nums">
               Page {currentPage + 1} of {pageCount}
             </span>

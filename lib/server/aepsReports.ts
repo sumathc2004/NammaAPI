@@ -4,15 +4,96 @@ import type { DashboardSectionId } from "@/lib/data/dashboardNav";
 import type { ReportRow, ReportTable } from "@/lib/reports/table";
 import type { SessionCredentials } from "@/lib/server/session";
 
+type ReportEndpoint = {
+  /** Path under AEPS_API_BASE_URL, called with GET. */
+  endpoint: string;
+  /** Vendor controller when it isn't "aeps", e.g. "BpPayment" (see aepsRequest). */
+  controller?: string;
+  /** Response format to request; the newer endpoints return JSON arrays. Default: XML. */
+  prefer?: "xml" | "json";
+  /** Query parameters. Identity always comes from the session, never from the browser. */
+  params: (credentials: SessionCredentials, fromDate: string, toDate: string) => Record<string, string>;
+  /** Optional clean-up of rows before they leave the server (e.g. masking personal data). */
+  transform?: (row: ReportRow) => ReportRow;
+};
+
+/** Ledger endpoints: GET …?UserName=&Password=&FromDate=&ToDate= */
+const ledgerParams: ReportEndpoint["params"] = (credentials, fromDate, toDate) => ({
+  UserName: credentials.userName,
+  Password: credentials.password,
+  FromDate: toVendorDate(fromDate),
+  ToDate: toVendorDate(toDate),
+});
+
+/** AEPS transaction type codes → readable names; unknown codes are shown as sent. */
+const AEPS_TRANSACTION_TYPES: Record<string, string> = {
+  CW: "Cash Withdrawal",
+  BE: "Balance Enquiry",
+  MS: "Mini Statement",
+  AP: "Aadhaar Pay",
+  CD: "Cash Deposit",
+};
+
+/** Report endpoints that take only the account's mobile number (no password) plus the date range. */
+const mobileNumberParams: ReportEndpoint["params"] = (credentials, fromDate, toDate) => ({
+  fromDate: toVendorDate(fromDate),
+  toDate: toVendorDate(toDate),
+  mobileNumber: credentials.userName,
+});
+
+/** "wallet_24Hours" → "Wallet 24 Hours" */
+function readableCode(value: string): string {
+  return value
+    .replace(/_/g, " ")
+    .replace(/(\d)([A-Za-z])/g, "$1 $2")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** "123456789012" → "XXXX XXXX 9012". Aadhaar numbers must never be shown (or sent to the browser) in full. */
+function maskAadhaar(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return digits.length >= 4 ? `XXXX XXXX ${digits.slice(-4)}` : value;
+}
+
 /**
- * Vendor endpoint behind each dashboard section that is a date-range report. Each is called as
- * GET {AEPS_API_BASE_URL}/{endpoint}?UserName=&Password=&FromDate=&ToDate=
+ * Vendor endpoint behind each dashboard section that is a date-range report.
  * To connect another section: add it here, add app/api/dashboard/<section>/route.ts calling
  * handleReportRequest(), and render <ReportView> on its page.
  */
-const REPORT_ENDPOINTS: Partial<Record<DashboardSectionId, string>> = {
-  "credit-ledger": "GetWalletTransactions_swallet",
-  "wallet-ledger": "GetWalletTransactions",
+const REPORT_ENDPOINTS: Partial<Record<DashboardSectionId, ReportEndpoint>> = {
+  "credit-ledger": { endpoint: "GetWalletTransactions_swallet", params: ledgerParams },
+  "wallet-ledger": { endpoint: "GetWalletTransactions", params: ledgerParams },
+  // GET GetTxnsByDate?fromDate=&toDate=&mobileNumber= — no password. The number is always the
+  // logged-in account's (from the session), so one user can't look up another's transactions.
+  "aeps-reports": {
+    endpoint: "GetTxnsByDate",
+    prefer: "json",
+    params: mobileNumberParams,
+    transform: (row) => {
+      const next = { ...row };
+      for (const key of Object.keys(next)) {
+        if (/a+dh?a+r/i.test(key) && next[key]) next[key] = maskAadhaar(next[key]);
+        if (/^transactiontype$/i.test(key)) next[key] = AEPS_TRANSACTION_TYPES[next[key].toUpperCase()] ?? next[key];
+      }
+      return next;
+    },
+  },
+  // GET .../api/BpPayment/GetLinksByDate?fromDate=&toDate=&mobileNumber= — card payment collections
+  // (JSON array). No password; the number comes from the session, as above.
+  "pg-reports": {
+    endpoint: "GetLinksByDate",
+    controller: "BpPayment",
+    prefer: "json",
+    params: mobileNumberParams,
+    transform: (row) => {
+      const next = { ...row };
+      // Card shown as "•••• 5968" (last 4 digits only, no card type).
+      const last4 = (row.CardNumber ?? "").replace(/\D/g, "").slice(-4);
+      if (last4) next.card = `•••• ${last4}`;
+      if (next.settlementType) next.settlementType = readableCode(next.settlementType);
+      return next;
+    },
+  },
 };
 
 /**
@@ -35,7 +116,9 @@ function toVendorDate(isoDate: string): string {
   }
 }
 
-export type ReportResult = { ok: true; table: ReportTable } | { ok: false; error: string; unavailable: boolean };
+export type ReportResult =
+  | { ok: true; table: ReportTable }
+  | { ok: false; error: string; unavailable: boolean; sessionExpired?: boolean };
 
 export async function fetchReport(
   section: DashboardSectionId,
@@ -43,14 +126,13 @@ export async function fetchReport(
   fromDate: string,
   toDate: string,
 ): Promise<ReportResult> {
-  const endpoint = REPORT_ENDPOINTS[section];
-  if (!endpoint) return { ok: false, error: "This report isn't available yet.", unavailable: false };
+  const config = REPORT_ENDPOINTS[section];
+  if (!config) return { ok: false, error: "This report isn't available yet.", unavailable: false };
+  const { endpoint } = config;
 
-  const result = await aepsRequest(endpoint, {
-    UserName: credentials.userName,
-    Password: credentials.password,
-    FromDate: toVendorDate(fromDate),
-    ToDate: toVendorDate(toDate),
+  const result = await aepsRequest(endpoint, config.params(credentials, fromDate, toDate), {
+    controller: config.controller,
+    prefer: config.prefer,
   });
   if (!result.ok) return { ok: false, error: result.error, unavailable: true };
 
@@ -58,15 +140,30 @@ export async function fetchReport(
   if (!records) {
     // No list in the response: either simply no entries, or a vendor error message.
     const message = findMessage(result.body);
-    if (!message || /^success/i.test(message) || NO_RECORDS_MESSAGE.test(message)) {
+    if (
+      !message ||
+      /^success/i.test(message) ||
+      NO_RECORDS_MESSAGE.test(message) ||
+      // The ledger endpoints answer { MESSAGE: "Failed", data: nil } for a range with no entries.
+      (/^failed$/i.test(message) && hasEmptyDataField(result.body))
+    ) {
       return { ok: true, table: { columns: [], rows: [] } };
+    }
+    if (CREDENTIALS_REJECTED_MESSAGE.test(message)) {
+      // Seen when the stored password no longer works (e.g. changed since login).
+      return { ok: false, error: "Your session has expired. Please log in again.", unavailable: false, sessionExpired: true };
     }
     // Safe to log: the vendor's message and response shape, never credentials or row values.
     console.warn(`AEPS ${endpoint} returned "${message}" (response keys: ${describeShape(result.body)}).`);
     return { ok: false, error: message, unavailable: false };
   }
 
-  const table = toTable(records);
+  const raw = toTable(records);
+  const rows = config.transform ? raw.rows.map(config.transform) : raw.rows;
+  // A transform can add fields (e.g. PG's combined "card"); include them as columns too.
+  const columns = [...raw.columns];
+  for (const row of rows) for (const key of Object.keys(row)) if (!columns.includes(key)) columns.push(key);
+  const table: ReportTable = { columns, rows };
   if (process.env.NODE_ENV === "development") {
     // Field names only (no values), to help map columns in lib/reports/layouts.ts.
     console.info(`AEPS ${endpoint} fields: ${table.columns.join(", ")}`);
@@ -77,7 +174,27 @@ export async function fetchReport(
 /** Vendor messages that mean "nothing in this period" rather than an error. */
 const NO_RECORDS_MESSAGE = /no\s*(record|data|transaction|entr)|not\s*found|record\s*not|empty/i;
 
+/** What the ledger endpoints return for a wrong UserName/Password (observed: "Cannot find table 0."). */
+const CREDENTIALS_REJECTED_MESSAGE = /cannot find table/i;
+
 type Json = Record<string, unknown>;
+
+/** True when the response has a `data` field that is null/empty (XML `<data i:nil="true"/>` parses to ""). */
+function hasEmptyDataField(node: unknown, depth = 0): boolean {
+  if (!isRecord(node) || depth > 2) return false;
+  for (const [key, value] of Object.entries(node)) {
+    if (/^data$/i.test(key)) {
+      return (
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        (Array.isArray(value) && value.length === 0) ||
+        (isRecord(value) && Object.keys(value).length === 0)
+      );
+    }
+  }
+  return Object.values(node).some((value) => hasEmptyDataField(value, depth + 1));
+}
 
 /** Tag/key names of the top two levels, e.g. "Response{MESSAGE,Status}" — for logs, no values. */
 function describeShape(node: unknown): string {
