@@ -1,12 +1,17 @@
 import "server-only";
 import { aepsRequest } from "@/lib/server/aepsClient";
 import type { DashboardSectionId } from "@/lib/data/dashboardNav";
-import type { ReportRow, ReportTable } from "@/lib/reports/table";
+import { REPORTS_START_DATE, toIsoDate } from "@/lib/reports/dates";
+import { parseDate, type ReportRow, type ReportTable } from "@/lib/reports/table";
 import type { SessionCredentials } from "@/lib/server/session";
 
 type ReportEndpoint = {
-  /** Path under AEPS_API_BASE_URL, called with GET. */
+  /** Path under the API's base URL (AEPS_API_BASE_URL by default). */
   endpoint: string;
+  /** Vendor API: "aeps" (default) or "client" (CLIENT_API_BASE_URL, see aepsRequest). */
+  api?: "aeps" | "client";
+  /** HTTP method. Default: GET. */
+  method?: "GET" | "POST";
   /** Vendor controller when it isn't "aeps", e.g. "BpPayment" (see aepsRequest). */
   controller?: string;
   /** Response format to request; the newer endpoints return JSON arrays. Default: XML. */
@@ -17,8 +22,8 @@ type ReportEndpoint = {
   transform?: (row: ReportRow) => ReportRow;
 };
 
-/** Ledger endpoints: GET …?UserName=&Password=&FromDate=&ToDate= */
-const ledgerParams: ReportEndpoint["params"] = (credentials, fromDate, toDate) => ({
+/** Ledger and transfer endpoints: …?UserName=&Password=&FromDate=&ToDate= */
+const credentialParams: ReportEndpoint["params"] = (credentials, fromDate, toDate) => ({
   UserName: credentials.userName,
   Password: credentials.password,
   FromDate: toVendorDate(fromDate),
@@ -49,6 +54,19 @@ function readableCode(value: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * Transfer remarks for a refunded transfer: "Refunded/Oct  6 2026  3:47PM" (the vendor still sends
+ * TxnStatus "success", UTR "-" and a UniqueTxnId ending in "R1" for these).
+ */
+const REFUNDED_REMARK = /^refunded\s*\/\s*(.*)$/i;
+
+/** "Oct  6 2026  3:47PM" → "6 Oct 2026, 3:47 pm"; anything else is returned with spaces tidied. */
+function readableVendorTimestamp(value: string): string {
+  const text = value.replace(/\s+/g, " ").trim();
+  const match = /^([A-Za-z]{3}) (\d{1,2}) (\d{4}) (\d{1,2}:\d{2}) ?([AP]M)$/i.exec(text);
+  return match ? `${match[2]} ${match[1]} ${match[3]}, ${match[4]} ${match[5].toLowerCase()}` : text;
+}
+
 /** "123456789012" → "XXXX XXXX 9012". Aadhaar numbers must never be shown (or sent to the browser) in full. */
 function maskAadhaar(value: string): string {
   const digits = value.replace(/\D/g, "");
@@ -61,8 +79,36 @@ function maskAadhaar(value: string): string {
  * handleReportRequest(), and render <ReportView> on its page.
  */
 const REPORT_ENDPOINTS: Partial<Record<DashboardSectionId, ReportEndpoint>> = {
-  "credit-ledger": { endpoint: "GetWalletTransactions_swallet", params: ledgerParams },
-  "wallet-ledger": { endpoint: "GetWalletTransactions", params: ledgerParams },
+  // POST {CLIENT_API_BASE_URL}/transfer/report?UserName=&Password=&FromDate=&ToDate= — JSON array of
+  // transfers; HTTP 401 "Invalid username or password" for wrong credentials, [] for an empty range.
+  transfer: {
+    endpoint: "transfer/report",
+    api: "client",
+    method: "POST",
+    prefer: "json",
+    params: credentialParams,
+    transform: (row) => {
+      const next = { ...row };
+      // "success" / "in queue" → "Success" / "In Queue".
+      if (next.TxnStatus) next.TxnStatus = readableCode(next.TxnStatus.toLowerCase());
+      // A refunded transfer moved no money: show it as Refunded (so totals skip it), with when.
+      const refund = REFUNDED_REMARK.exec(row.Remarks ?? "");
+      if (refund) {
+        next.TxnStatus = "Refunded";
+        next.Remarks = refund[1] ? `Refunded on ${readableVendorTimestamp(refund[1])}` : "Refunded";
+      } else if (next.Remarks && /^[A-Z][A-Z ]+$/.test(next.Remarks)) {
+        // "COMPLETED" → "Completed"
+        next.Remarks = next.Remarks[0] + next.Remarks.slice(1).toLowerCase();
+      }
+      // No bank UTR yet: refunded rows send "-", queued ones repeat their own UniqueTxnId.
+      if (next.UTR === "-" || (next.UTR && next.UTR === next.UniqueTxnId)) next.UTR = "";
+      // Names arrive as "Mrs_SUMA_D".
+      if (next.BeneficiaryName) next.BeneficiaryName = next.BeneficiaryName.replace(/_+/g, " ").trim();
+      return next;
+    },
+  },
+  "credit-ledger": { endpoint: "GetWalletTransactions_swallet", params: credentialParams },
+  "wallet-ledger": { endpoint: "GetWalletTransactions", params: credentialParams },
   // GET GetTxnsByDate?fromDate=&toDate=&mobileNumber= — no password. The number is always the
   // logged-in account's (from the session), so one user can't look up another's transactions.
   "aeps-reports": {
@@ -131,10 +177,18 @@ export async function fetchReport(
   const { endpoint } = config;
 
   const result = await aepsRequest(endpoint, config.params(credentials, fromDate, toDate), {
+    api: config.api,
+    method: config.method,
     controller: config.controller,
     prefer: config.prefer,
   });
-  if (!result.ok) return { ok: false, error: result.error, unavailable: true };
+  if (!result.ok) {
+    // The client API answers a wrong username/password with HTTP 401.
+    if (result.status === 401) {
+      return { ok: false, error: "Your session has expired. Please log in again.", unavailable: false, sessionExpired: true };
+    }
+    return { ok: false, error: result.error, unavailable: true };
+  }
 
   const records = findRecords(result.body);
   if (!records) {
@@ -159,7 +213,16 @@ export async function fetchReport(
   }
 
   const raw = toTable(records);
-  const rows = config.transform ? raw.rows.map(config.transform) : raw.rows;
+  const transformed = config.transform ? raw.rows.map(config.transform) : raw.rows;
+  // Never pass on anything dated before REPORTS_START_DATE, whatever range the vendor returned.
+  // Rows without a readable date are dropped too: when in doubt, don't show it.
+  const rows = transformed.filter((row) => {
+    const date = rowDate(row);
+    return date !== null && date >= REPORTS_START_DATE;
+  });
+  if (process.env.NODE_ENV === "development" && rows.length < transformed.length) {
+    console.info(`AEPS ${endpoint}: hid ${transformed.length - rows.length} rows dated before ${REPORTS_START_DATE} or undated.`);
+  }
   // A transform can add fields (e.g. PG's combined "card"); include them as columns too.
   const columns = [...raw.columns];
   for (const row of rows) for (const key of Object.keys(row)) if (!columns.includes(key)) columns.push(key);
@@ -169,6 +232,19 @@ export async function fetchReport(
     console.info(`AEPS ${endpoint} fields: ${table.columns.join(", ")}`);
   }
   return { ok: true, table };
+}
+
+/**
+ * A row's calendar date as "yyyy-MM-dd": the first date/time field that parses. Vendor times carry
+ * no timezone, so they're read and compared as the vendor's own (Indian) wall-clock dates.
+ */
+function rowDate(row: ReportRow): string | null {
+  for (const [key, value] of Object.entries(row)) {
+    if (!value || !/date|time/i.test(key)) continue;
+    const date = parseDate(value);
+    if (date) return toIsoDate(date);
+  }
+  return null;
 }
 
 /** Vendor messages that mean "nothing in this period" rather than an error. */

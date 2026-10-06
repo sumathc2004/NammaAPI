@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { getDashboardSection, type DashboardSectionId } from "@/lib/data/dashboardNav";
 import { clearDemoSession } from "@/lib/auth/demoSession";
-import { datePresets, rangeForDays, toIsoDate, validateRange } from "@/lib/reports/dates";
+import { REPORTS_START_DATE, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import {
   amountTone,
   cellValue,
+  columnTitle,
   dateCellText,
   describeColumns,
   formatAmount,
-  formatDate,
   layoutColumns,
   sumColumn,
   toCsv,
@@ -21,7 +21,7 @@ import {
   type ReportRow,
   type ReportTable,
 } from "@/lib/reports/table";
-import { reportLayouts } from "@/lib/reports/layouts";
+import { reportLayouts, reportViews } from "@/lib/reports/layouts";
 import { cn } from "@/lib/cn";
 
 const PAGE_SIZE = 50;
@@ -57,6 +57,8 @@ const STATUS_STYLES: Record<string, string> = {
   failed: "bg-status-failed-bg text-status-failed",
   failure: "bg-status-failed-bg text-status-failed",
   pending: "bg-status-pending-bg text-status-pending",
+  "in queue": "bg-status-pending-bg text-status-pending",
+  queued: "bg-status-pending-bg text-status-pending",
   processing: "bg-status-processing-bg text-status-processing",
   cancelled: "bg-status-cancelled-bg text-status-cancelled",
   refunded: "bg-status-cancelled-bg text-status-cancelled",
@@ -67,6 +69,7 @@ const STATUS_STYLES: Record<string, string> = {
 const HIDE_BELOW: Record<NonNullable<ColumnInfo["hideBelow"]>, string> = {
   lg: "hidden lg:table-cell",
   xl: "hidden xl:table-cell",
+  "2xl": "hidden 2xl:table-cell",
 };
 
 /** Long single tokens such as reference numbers or IDs ("061026131023036730741"). */
@@ -131,16 +134,60 @@ function Cell({ column, row, variant = "card" }: { column: ColumnInfo; row: Repo
           {value}
         </span>
       );
-    default:
-      if (variant === "table" && isCode(value)) {
-        return <span className="font-mono text-xs text-text-secondary wrap-anywhere">{value}</span>;
-      }
+    default: {
+      const sub = column.subKey ? row[column.subKey] : "";
+      const text = <TextValue value={value} format={column.format} variant={variant} />;
+      if (!sub) return text;
+      // Second field underneath, e.g. the IFSC under the account number.
       return (
-        <span className={cn("wrap-anywhere", variant === "table" && "line-clamp-2")} title={variant === "table" ? value : undefined}>
-          {value}
+        <span className="block">
+          <span className="block">{text}</span>
+          <span className="block text-text-secondary">
+            <TextValue value={sub} format={column.format} variant={variant} muted />
+          </span>
         </span>
       );
+    }
   }
+}
+
+function TextValue({
+  value,
+  format,
+  variant,
+  muted = false,
+}: {
+  value: string;
+  format: ColumnInfo["format"];
+  variant: "table" | "card";
+  muted?: boolean;
+}) {
+  // IDs and numbers: monospace, and in the table never broken mid-number.
+  if (format === "code") {
+    return (
+      <span
+        className={cn(
+          "font-mono text-xs tabular-nums",
+          variant === "table" ? "whitespace-nowrap" : "wrap-anywhere",
+          muted ? "text-text-secondary" : "text-text-primary",
+        )}
+      >
+        {value}
+      </span>
+    );
+  }
+  if (variant === "table" && isCode(value)) {
+    return <span className="font-mono text-xs text-text-secondary wrap-anywhere">{value}</span>;
+  }
+  return (
+    <span
+      // "words": names and remarks wrap between words only, never mid-word.
+      className={cn(format === "words" ? "wrap-break-word" : "wrap-anywhere", variant === "table" && "line-clamp-2")}
+      title={variant === "table" ? value : undefined}
+    >
+      {value}
+    </span>
+  );
 }
 
 type CardLayout = {
@@ -169,11 +216,15 @@ function planCard(columns: ColumnInfo[], table: ReportTable | null): CardLayout 
   const avgLength = (c: ColumnInfo) =>
     rows.length ? rows.reduce((sum, row) => sum + (row[c.key]?.length ?? 0), 0) / rows.length : 0;
   const title =
-    textColumns.find((c) => /narration|description|remark|particular|customer/i.test(c.label)) ??
+    textColumns.find((c) => /narration|description|remark|particular|customer|beneficiary/i.test(c.label)) ??
     [...textColumns].sort((a, b) => avgLength(b) - avgLength(a))[0];
 
+  // Columns with a second field (Account + IFSC) stay in the details, where both lines fit.
   const isCodeColumn = (c: ColumnInfo) =>
-    c.kind === "text" && rows.some((row) => row[c.key]) && rows.every((row) => !row[c.key] || isCode(row[c.key]));
+    c.kind === "text" &&
+    !c.subKey &&
+    rows.some((row) => row[c.key]) &&
+    rows.every((row) => !row[c.key] || isCode(row[c.key]));
 
   const placed = new Set([title, date, amount, ...badges].filter(Boolean));
   const remaining = columns.filter((c) => !placed.has(c));
@@ -232,7 +283,7 @@ function RowCard({ row, layout }: { row: ReportRow; layout: CardLayout }) {
         <dl className="space-y-1.5 border-t border-brand-border/70 px-3.5 py-2.5">
           {details.map((column) => (
             <div key={column.key} className="flex items-baseline justify-between gap-4">
-              <dt className="shrink-0 text-xs text-text-secondary">{column.label}</dt>
+              <dt className="shrink-0 text-xs text-text-secondary">{columnTitle(column)}</dt>
               <dd
                 className={cn(
                   "min-w-0 text-right text-sm text-text-primary",
@@ -262,19 +313,87 @@ function RowCard({ row, layout }: { row: ReportRow; layout: CardLayout }) {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "credit" | "debit" }) {
+/** Credit/debit totals for the selected dates, as one compact strip in the toolbar. */
+function Totals({ credit, debit, className }: { credit: number | null; debit: number | null; className?: string }) {
   return (
-    <div className="rounded-xl border border-brand-border bg-white px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-text-secondary">{label}</p>
-      <p
-        className={cn(
-          "mt-0.5 text-lg font-bold tabular-nums",
-          tone === "credit" ? "text-status-success" : tone === "debit" ? "text-status-failed" : "text-text-primary",
+    <dl
+      title="Totals for the selected dates"
+      className={cn(
+        "flex h-9 min-w-0 items-center divide-x divide-brand-border rounded-lg border border-brand-border bg-white text-xs",
+        className,
+      )}
+    >
+      {credit != null && (
+        <div className="flex min-w-0 items-baseline gap-1.5 px-2.5">
+          <dt className="text-text-secondary">Credit</dt>
+          <dd className="truncate font-semibold tabular-nums text-status-success">{formatAmount(String(credit))}</dd>
+        </div>
+      )}
+      {debit != null && (
+        <div className="flex min-w-0 items-baseline gap-1.5 px-2.5">
+          <dt className="text-text-secondary">Debit</dt>
+          <dd className="truncate font-semibold tabular-nums text-status-failed">{formatAmount(String(debit))}</dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+function PageButton({ direction, disabled, onClick }: { direction: "previous" | "next"; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={direction === "previous" ? "Previous page" : "Next page"}
+      className="flex h-9 w-9 items-center justify-center rounded-lg border border-brand-border bg-white text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:pointer-events-none disabled:opacity-35"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d={direction === "previous" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
+      </svg>
+    </button>
+  );
+}
+
+/** "1–50 of 473" with previous/next buttons; just "12 entries" when everything fits on one page. */
+function Pager({
+  page,
+  total,
+  onPage,
+  className,
+}: {
+  page: number;
+  total: number;
+  onPage: (page: number) => void;
+  className?: string;
+}) {
+  if (total === 0) return null;
+  const pageCount = Math.ceil(total / PAGE_SIZE);
+  const first = page * PAGE_SIZE + 1;
+  const last = Math.min(total, (page + 1) * PAGE_SIZE);
+  const n = (value: number) => value.toLocaleString("en-IN");
+
+  return (
+    <nav aria-label="Pages" className={cn("flex items-center gap-2", className)}>
+      <span className="whitespace-nowrap text-xs tabular-nums text-text-secondary" aria-live="polite">
+        {pageCount > 1 ? (
+          <>
+            <span className="font-semibold text-text-primary">
+              {n(first)}–{n(last)}
+            </span>{" "}
+            of {n(total)}
+          </>
+        ) : (
+          `${n(total)} ${total === 1 ? "entry" : "entries"}`
         )}
-      >
-        {value}
-      </p>
-    </div>
+      </span>
+      {pageCount > 1 && (
+        <span className="flex gap-1">
+          <PageButton direction="previous" disabled={page === 0} onClick={() => onPage(page - 1)} />
+          <PageButton direction="next" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)} />
+        </span>
+      )}
+    </nav>
   );
 }
 
@@ -284,12 +403,15 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   const { label } = getDashboardSection(section);
   const today = toIsoDate(new Date());
 
-  const [range, setRange] = useState<Range>(() => rangeForDays(1));
+  const [range, setRange] = useState<Range>(() => ({ from: today, to: today }));
   const [draft, setDraft] = useState<Range>(range);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
+  const views = reportViews[section];
+  const [viewId, setViewId] = useState(views?.[0]?.id);
+  const activeView = views?.find((v) => v.id === viewId);
 
   useEffect(() => {
     let cancelled = false;
@@ -323,12 +445,19 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     [table, layout],
   );
 
-  const filteredRows = useMemo(() => {
+  // Rows of the selected tab (e.g. Transfer's All / Queue / Refundable), then the search on top.
+  const viewRows = useMemo(() => {
     if (!table) return [];
+    const match = activeView?.match;
+    return match ? table.rows.filter(match) : table.rows;
+  }, [table, activeView]);
+
+  const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return table.rows;
-    return table.rows.filter((row) => columns.some((c) => (row[c.key] ?? "").toLowerCase().includes(needle)));
-  }, [table, columns, query]);
+    if (!needle) return viewRows;
+    const matches = (row: ReportRow, key?: string) => !!key && (row[key] ?? "").toLowerCase().includes(needle);
+    return viewRows.filter((row) => columns.some((c) => matches(row, c.key) || matches(row, c.subKey)));
+  }, [viewRows, columns, query]);
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -358,19 +487,29 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       debit: debitColumn ? sumColumn(counted, debitColumn.key) : null,
     };
   }, [table, columns]);
+  const showTotals = !!table && table.rows.length > 0 && (totals?.credit != null || totals?.debit != null);
 
-  const activePreset = datePresets.find((p) => {
-    const r = rangeForDays(p.days);
-    return r.from === range.from && r.to === range.to;
-  })?.id;
+  // A new page, tab or search starts at the first row, not wherever the table was scrolled to.
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    tableScrollRef.current?.scrollTo({ top: 0 });
+  }, [currentPage, activeView, query, table]);
+
+  function goToPage(next: number) {
+    setPage(next);
+    // Phones: the page itself scrolls; bring the toolbar back into view so the new page starts at its first card.
+    toolbarRef.current?.scrollIntoView({ block: "nearest" });
+  }
 
   function exportCsv() {
     // The byte order mark tells Excel the file is UTF-8; without it "•" and "₹" come out garbled.
-    const blob = new Blob(["﻿", toCsv(columns, filteredRows)], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([String.fromCharCode(0xfeff), toCsv(columns, filteredRows)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${section}_${range.from}_${range.to}.csv`;
+    const viewSuffix = activeView?.match ? `_${activeView.id}` : "";
+    link.download = `${section}${viewSuffix}_${range.from}_${range.to}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -396,27 +535,12 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Quick date ranges" className="flex h-9 items-center rounded-lg border border-brand-border bg-white p-0.5">
-            {datePresets.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                aria-pressed={activePreset === preset.id}
-                onClick={() => apply(rangeForDays(preset.days))}
-                className={cn(
-                  "rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors",
-                  activePreset === preset.id ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
-                )}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-
           <form onSubmit={handleSubmit} className="flex w-full items-center gap-1.5 md:w-auto">
+            {/* Nothing before REPORTS_START_DATE can be picked; the server enforces the same limit. */}
             <DatePicker
               label="From"
               value={draft.from}
+              min={REPORTS_START_DATE}
               max={draft.to}
               onChange={(from) => setDraft((d) => ({ ...d, from }))}
               className="min-w-0 flex-1 md:w-52 md:flex-none"
@@ -449,46 +573,58 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
         </p>
       )}
 
-      {/* Summary — phones: one slim bar */}
-      {table && (
-        <dl className="flex divide-x divide-brand-border rounded-xl border border-brand-border bg-white md:hidden">
-          <div className="min-w-0 flex-1 px-3 py-2">
-            <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Entries</dt>
-            <dd className="text-sm font-bold tabular-nums text-text-primary">{table.rows.length.toLocaleString("en-IN")}</dd>
-          </div>
-          {totals?.credit != null && (
-            <div className="min-w-0 flex-1 px-3 py-2">
-              <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Credit</dt>
-              <dd className="truncate text-sm font-bold tabular-nums text-status-success">{formatAmount(String(totals.credit))}</dd>
-            </div>
-          )}
-          {totals?.debit != null && (
-            <div className="min-w-0 flex-1 px-3 py-2">
-              <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">Debit</dt>
-              <dd className="truncate text-sm font-bold tabular-nums text-status-failed">{formatAmount(String(totals.debit))}</dd>
-            </div>
-          )}
-        </dl>
-      )}
-
-      {/* Summary — tablet and up: stat cards */}
-      {table && (
-        <div className="hidden grid-cols-4 gap-3 md:grid">
-          <Stat label="Entries" value={table.rows.length.toLocaleString("en-IN")} />
-          {totals?.credit != null && <Stat label="Total credit" value={formatAmount(String(totals.credit))} tone="credit" />}
-          {totals?.debit != null && <Stat label="Total debit" value={formatAmount(String(totals.debit))} tone="debit" />}
-          <Stat
-            label="Period"
-            value={range.from === range.to ? formatDate(range.from) : `${formatDate(range.from)} – ${formatDate(range.to)}`}
-          />
-        </div>
-      )}
-
       {/* Table */}
       {/* Phones: no box around the list, so cards use the full width */}
       <div className="md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden md:rounded-2xl md:border md:border-brand-border md:bg-white md:shadow-sm">
-        <div className="flex shrink-0 items-center gap-2 md:justify-between md:border-b md:border-brand-border md:px-3 md:py-2.5">
-          <div className="relative min-w-0 flex-1 md:w-72 md:flex-none">
+        {/*
+          Toolbar. Wider screens, one line: tabs, search, totals, then pager and Export on the right.
+          Phones: tabs; search + Export; totals + pager (the wrapper uses md:contents so its
+          children join the main row on wider screens).
+        */}
+        <div
+          ref={toolbarRef}
+          className="flex shrink-0 scroll-mt-3 flex-wrap items-center gap-2 md:border-b md:border-brand-border md:px-3 md:py-2.5"
+        >
+          {views && (
+            <div
+              role="group"
+              aria-label="Show"
+              className="order-1 flex h-9 w-full items-center rounded-lg border border-brand-border bg-white p-0.5 lg:w-auto"
+            >
+              {views.map((view) => {
+                const active = view.id === activeView?.id;
+                const count = table ? (view.match ? table.rows.filter(view.match).length : table.rows.length) : null;
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      setViewId(view.id);
+                      setPage(0);
+                    }}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors lg:flex-none",
+                      active ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
+                    )}
+                  >
+                    {view.label}
+                    {count != null && (
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 text-[10px] tabular-nums",
+                          active ? "bg-white/20 text-white" : "bg-brand-light text-text-secondary",
+                        )}
+                      >
+                        {count.toLocaleString("en-IN")}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="relative order-2 min-w-0 flex-1 md:w-56 md:flex-none xl:w-72">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"
@@ -517,27 +653,24 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
               className={cn(inputClasses, "w-full pl-9 disabled:bg-brand-light/50")}
             />
           </div>
-          <div className="flex shrink-0 items-center gap-3">
-            {table && table.rows.length > 0 && (
-              <span className="hidden text-xs text-text-secondary tabular-nums md:inline">
-                {filteredRows.length === table.rows.length
-                  ? `${table.rows.length.toLocaleString("en-IN")} entries`
-                  : `${filteredRows.length.toLocaleString("en-IN")} of ${table.rows.length.toLocaleString("en-IN")}`}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={exportCsv}
-              disabled={filteredRows.length === 0}
-              title="Export CSV"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-brand-border bg-white px-2.5 text-sm font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-40 disabled:hover:border-brand-border disabled:hover:text-text-primary md:px-3"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
-              </svg>
-              <span className="sr-only md:not-sr-only">Export</span>
-            </button>
-          </div>
+          {(showTotals || filteredRows.length > 0) && (
+            <div className="order-4 flex w-full flex-wrap items-center justify-between gap-2 md:contents">
+              {showTotals && totals && <Totals credit={totals.credit} debit={totals.debit} className="md:order-3" />}
+              <Pager page={currentPage} total={filteredRows.length} onPage={goToPage} className="ml-auto md:order-4" />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={filteredRows.length === 0}
+            title="Export CSV"
+            className="order-3 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-brand-border bg-white px-2.5 text-sm font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-40 disabled:hover:border-brand-border disabled:hover:text-text-primary md:order-5 md:px-3"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+            </svg>
+            <span className="sr-only md:not-sr-only">Export</span>
+          </button>
         </div>
 
         {state.status === "loading" && (
@@ -569,7 +702,11 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
         {table && filteredRows.length === 0 && (
           <p className="px-6 py-14 text-center text-sm text-text-secondary mt-3 rounded-xl border border-brand-border bg-white md:mt-0 md:rounded-none md:border-0">
-            {table.rows.length === 0 ? "No entries for this period." : "No entries match your search."}
+            {table.rows.length === 0
+              ? "No entries for this period."
+              : viewRows.length === 0
+                ? (activeView?.emptyText ?? "No entries for this period.")
+                : "No entries match your search."}
           </p>
         )}
 
@@ -581,10 +718,19 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
             ))}
           </ul>
         )}
+        {/* Phones: the pager again under the last card, so the next page is one tap away */}
+        {table && pageCount > 1 && (
+          <Pager
+            page={currentPage}
+            total={filteredRows.length}
+            onPage={goToPage}
+            className="mt-3 justify-between rounded-xl border border-brand-border bg-white px-3 py-2 md:hidden"
+          />
+        )}
 
         {/* Tablet and up: table */}
         {table && filteredRows.length > 0 && (
-          <div className="scrollbar-light hidden min-h-40 overflow-auto md:block md:flex-1">
+          <div ref={tableScrollRef} className="scrollbar-light hidden min-h-40 overflow-auto md:block md:flex-1">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">
                 {label}, {range.from} to {range.to}
@@ -601,7 +747,7 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                         column.hideBelow && HIDE_BELOW[column.hideBelow],
                       )}
                     >
-                      {column.label}
+                      {columnTitle(column)}
                     </th>
                   ))}
                 </tr>
@@ -629,31 +775,6 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
           </div>
         )}
 
-        {table && pageCount > 1 && (
-          <div className="flex shrink-0 items-center justify-between px-4 py-2.5 text-xs text-text-secondary mt-3 rounded-xl border border-brand-border bg-white md:mt-0 md:rounded-none md:border-0 md:border-t">
-            <span className="tabular-nums">
-              Page {currentPage + 1} of {pageCount}
-            </span>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => setPage(currentPage - 1)}
-                disabled={currentPage === 0}
-                className="rounded-md border border-brand-border px-3 py-1.5 font-medium text-text-primary hover:border-brand-primary disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage(currentPage + 1)}
-                disabled={currentPage >= pageCount - 1}
-                className="rounded-md border border-brand-border px-3 py-1.5 font-medium text-text-primary hover:border-brand-primary disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
