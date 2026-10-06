@@ -124,9 +124,7 @@ export function formatAmount(value: string): string {
 }
 
 /** "03 Oct 2026, 5:46 pm" — the time is left out when it's exactly midnight (a date-only value). */
-export function formatDate(value: string): string {
-  const date = parseDate(value);
-  if (!date) return value;
+function showDate(date: Date): string {
   return date.toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -135,25 +133,31 @@ export function formatDate(value: string): string {
   });
 }
 
+export function formatDate(value: string): string {
+  const date = parseDate(value);
+  return date ? showDate(date) : value;
+}
+
 /**
- * Text for a Date & Time cell. Vendors may send a date-only field plus a separate time — or a
- * second field that already holds the full date and time; show the most complete one once.
+ * The date in a Date & Time cell, or its raw text when it can't be parsed. Vendors may send a
+ * date-only field plus a separate time — or a second field that already holds the full date and
+ * time; use the most complete one.
  */
-export function dateCellText(column: ColumnInfo, row: ReportRow): string {
+function dateCellValue(column: ColumnInfo, row: ReportRow): Date | string {
   const primary = row[column.key] ?? "";
   const extra = column.extraKey ? (row[column.extraKey] ?? "") : "";
-  if (!extra) return formatDate(primary);
-
   const primaryDate = parseDate(primary);
+  if (!extra) return primaryDate ?? primary;
+
   const extraDate = parseDate(extra);
   if (extraDate) {
-    // The second field is itself a full date: show whichever of the two carries a real time.
-    const useExtra = hasTimeOfDay(extraDate) || !primaryDate || !hasTimeOfDay(primaryDate);
-    return formatDate(useExtra ? extra : primary);
+    // The second field is itself a full date: use whichever of the two carries a real time.
+    if (primaryDate && hasTimeOfDay(primaryDate) && !hasTimeOfDay(extraDate)) return primaryDate;
+    return extraDate;
   }
-  if (primaryDate && hasTimeOfDay(primaryDate)) return formatDate(primary);
+  if (primaryDate && hasTimeOfDay(primaryDate)) return primaryDate;
 
-  // A time-only field ("17:46:26", "5:46 PM"): put it on the primary date and format both together.
+  // A time-only field ("17:46:26", "5:46 PM"): put it on the primary date.
   const time = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(extra.trim());
   if (primaryDate && time) {
     const [, hour, minute, second = "0", meridiem] = time;
@@ -161,9 +165,15 @@ export function dateCellText(column: ColumnInfo, row: ReportRow): string {
     if (meridiem?.toUpperCase() === "PM") h += 12;
     const combined = new Date(primaryDate);
     combined.setHours(h, Number(minute), Number(second));
-    return combined.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+    return combined;
   }
   return [formatDate(primary), extra].filter(Boolean).join(", ");
+}
+
+/** Text for a Date & Time cell, shown once even when the vendor splits or repeats it. */
+export function dateCellText(column: ColumnInfo, row: ReportRow): string {
+  const value = dateCellValue(column, row);
+  return typeof value === "string" ? value : showDate(value);
 }
 
 /** Sum of a numeric column across rows. */
@@ -171,13 +181,50 @@ export function sumColumn(rows: ReportRow[], key: string): number {
   return rows.reduce((total, row) => total + (Number((row[key] ?? "").replace(/,/g, "")) || 0), 0);
 }
 
-/** CSV text for the given rows, with human-readable headers. */
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** "2026-10-06 13:35" (or "2026-10-06" at midnight): a form Excel reads as a real, sortable date. */
+function csvDate(date: Date): string {
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return hasTimeOfDay(date) ? `${day} ${pad(date.getHours())}:${pad(date.getMinutes())}` : day;
+}
+
+/** A CSV cell written so Excel shows it as intended (the caller still applies CSV quoting). */
+function csvCell(column: ColumnInfo, row: ReportRow): string {
+  if (column.kind === "date") {
+    const value = dateCellValue(column, row);
+    return typeof value === "string" ? csvText(value) : csvDate(value);
+  }
+  const value = cellValue(column, row);
+  if (column.kind === "amount") {
+    const amount = Number(value.replace(/,/g, ""));
+    // Plain numbers with two decimals, so Excel can sum them.
+    if (value && !Number.isNaN(amount)) return amount.toFixed(2);
+  }
+  return csvText(value);
+}
+
+function csvText(value: string): string {
+  // Long digit-only IDs (UTR, reference numbers) or ones with a leading zero: Excel would turn
+  // them into numbers, keeping 15 significant digits ("6.10261E+20") and dropping leading zeros.
+  // The ="…" form makes Excel keep them as text.
+  if (/^\d{12,}$/.test(value) || /^0\d+$/.test(value)) return `="${value}"`;
+  // Names and remarks come from outside data; a value starting with = + - @ would run as a
+  // formula in Excel (CSV injection), so a leading apostrophe makes it plain text.
+  if (/^[=+\-@\t\r]/.test(value)) return `'${value}`;
+  return value;
+}
+
+/**
+ * CSV text for the given rows, with human-readable headers, laid out for Excel: dates as
+ * yyyy-MM-dd HH:mm, amounts as plain numbers, long IDs kept as text, formulas neutralised,
+ * CRLF line endings. The caller adds the UTF-8 byte order mark when saving it as a file.
+ */
 export function toCsv(columns: ColumnInfo[], rows: ReportRow[]): string {
-  const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const escape = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   const header = columns.map((c) => escape(c.label)).join(",");
-  const cell = (row: ReportRow, c: ColumnInfo) => (c.kind === "date" ? dateCellText(c, row) : cellValue(c, row));
-  const body = rows.map((row) => columns.map((c) => escape(cell(row, c))).join(","));
-  return [header, ...body].join("\n");
+  const body = rows.map((row) => columns.map((c) => escape(csvCell(c, row))).join(","));
+  return [header, ...body].join("\r\n");
 }
 
 /** One column of a fixed report layout, matched to whichever vendor field fits it. */
