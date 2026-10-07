@@ -20,6 +20,8 @@ type OtpDialogProps = {
   length: number;
   /** Prototype only: when set, the expected OTP is printed in the modal. */
   demoOtp?: string;
+  /** Fills the boxes on open (PROTOTYPE: the account's default OTP), so only Verify needs pressing. */
+  prefill?: string;
   /** Returns an error message, or null when the OTP matched. */
   onVerify: (otp: string) => string | null;
   /** Requests a new OTP. Returns an error message, or null on success. */
@@ -48,11 +50,13 @@ function Spinner() {
   );
 }
 
-export function OtpDialog({ phone, length, demoOtp, onVerify, onResend, onClose }: OtpDialogProps) {
+export function OtpDialog({ phone, length, demoOtp, prefill, onVerify, onResend, onClose }: OtpDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
-  const [digits, setDigits] = useState<string[]>(() => Array(length).fill(""));
+  const [digits, setDigits] = useState<string[]>(() =>
+    prefill && prefill.length === length ? prefill.split("") : Array(length).fill(""),
+  );
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);

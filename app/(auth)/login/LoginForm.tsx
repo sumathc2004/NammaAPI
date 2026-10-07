@@ -13,6 +13,9 @@ import { OtpDialog } from "./OtpDialog";
 /** PROTOTYPE: set to true to print the expected OTP (the account's defaultOTP) inside the modal. */
 const SHOW_DEMO_OTP = false;
 
+/** PROTOTYPE: pre-fill the OTP boxes with the account's defaultOTP, so login is Verify-only. */
+const PREFILL_DEFAULT_OTP = true;
+
 type CredentialErrors = { phoneNumber?: string; password?: string };
 type PendingLogin = { otp: string; profile: AepsProfile };
 
@@ -118,6 +121,7 @@ export function LoginForm() {
           phone={phoneNumber}
           length={pending.otp.length}
           demoOtp={SHOW_DEMO_OTP ? pending.otp : undefined}
+          prefill={PREFILL_DEFAULT_OTP ? pending.otp : undefined}
           onVerify={handleVerify}
           onResend={requestOtp}
           onClose={() => setPending(null)}
