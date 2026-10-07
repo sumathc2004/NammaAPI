@@ -619,6 +619,24 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     | { action: TransferAction; status: "error"; error: string; id: string }
     | null
   >(null);
+  // After a Dequeue the vendor needs a moment to move the row to Refundable, so re-load the report
+  // 10s later — quietly (no loading state), keeping the page, tab and scroll position.
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rangeRef = useRef(range);
+  useEffect(() => {
+    rangeRef.current = range;
+  }, [range]);
+  useEffect(() => () => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+  }, []);
+  function scheduleQuietReload() {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    const scheduledFor = rangeRef.current;
+    reloadTimer.current = setTimeout(async () => {
+      const next = await loadReport(section, scheduledFor);
+      if (next.status === "ready" && rangeRef.current === scheduledFor) setState(next);
+    }, 10_000);
+  }
   async function runTransferAction(action: TransferAction, uniqueTxnId: string, id: string) {
     if (pendingAction) return;
     setPendingAction({ uniqueTxnId, action });
@@ -632,6 +650,7 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       const data = await response.json().catch(() => null);
       if (response.ok && data?.ok) {
         setActionResult({ action, status: "ok", message: data.message || "Done.", id });
+        if (action === "dequeue") scheduleQuietReload();
         setState((prev) =>
           prev.status === "ready"
             ? {
@@ -1122,6 +1141,9 @@ function TransferActionResultDialog({ result, onClose }: { result: TransferActio
       <p className="mt-1.5 text-xs text-text-secondary">
         Id: <span className="font-mono">{result.id}</span>
       </p>
+      {result.status === "ok" && result.action === "dequeue" && (
+        <p className="mt-1.5 text-xs text-text-secondary">The list will refresh in 10 seconds.</p>
+      )}
       {result.status !== "pending" && (
         <button
           type="button"
