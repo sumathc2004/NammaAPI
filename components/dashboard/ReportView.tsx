@@ -14,6 +14,7 @@ import {
   dateCellText,
   describeColumns,
   formatAmount,
+  isRefreshableTransfer,
   layoutColumns,
   sumColumn,
   toCsv,
@@ -417,19 +418,6 @@ function Pager({
   );
 }
 
-/** Transfer only: Success with no (or no valid) UTR yet is the one state worth a manual re-check. */
-// Placeholder values the vendor sends instead of a real bank UTR — not just a blank field.
-const IMPROPER_UTR = /^(-|0+|n\/?a|null|nil|pending|tbd|na)$/i;
-
-/** A real bank UTR is exactly 12 digits; anything else (blank, placeholder, wrong length) isn't proper. */
-function isProperUtr(utr: string | undefined): boolean {
-  const value = (utr ?? "").trim();
-  if (!value || IMPROPER_UTR.test(value)) return false;
-  return /^\d{12}$/.test(value);
-}
-
-const isRefreshableTransfer = (row: ReportRow) => row.TxnStatus === "Success" && !isProperUtr(row.UTR);
-
 function RefreshUtrButton({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
   return (
     <button
@@ -553,12 +541,6 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     const matches = (row: ReportRow, key?: string) => !!key && (row[key] ?? "").toLowerCase().includes(needle);
     return viewRows.filter((row) => columns.some((c) => matches(row, c.key) || matches(row, c.subKey)));
   }, [viewRows, columns, query]);
-
-  // Success rows still waiting on a proper UTR — the count shown on the Refresh button, so it's visible without reloading.
-  const pendingUtrCount = useMemo(
-    () => (section === "transfer" && table ? table.rows.filter(isRefreshableTransfer).length : 0),
-    [section, table],
-  );
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -688,78 +670,45 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
           ref={toolbarRef}
           className="flex shrink-0 scroll-mt-3 flex-wrap items-center gap-2 md:border-b md:border-brand-border md:px-3 md:py-2.5"
         >
-          <div
-            role="group"
-            aria-label="Show"
-            className="order-1 flex h-9 w-full items-center gap-0.5 rounded-lg border border-brand-border bg-white p-0.5 lg:w-auto"
-          >
-            {views?.map((view) => {
-              const active = view.id === activeView?.id;
-              const count = table ? (view.match ? table.rows.filter(view.match).length : table.rows.length) : null;
-              return (
-                <button
-                  key={view.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => {
-                    setViewId(view.id);
-                    setPage(0);
-                  }}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors lg:flex-none",
-                    active ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
-                  )}
-                >
-                  {view.label}
-                  {count != null && (
-                    <span
-                      className={cn(
-                        "rounded-full px-1.5 text-[10px] tabular-nums",
-                        active ? "bg-white/20 text-white" : "bg-brand-light text-text-secondary",
-                      )}
-                    >
-                      {count.toLocaleString("en-IN")}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-            {views && <span className="mx-0.5 h-5 w-px shrink-0 bg-brand-border" aria-hidden="true" />}
-            <button
-              type="button"
-              onClick={() => apply(range)}
-              disabled={state.status === "loading"}
-              aria-label={pendingUtrCount > 0 ? `Refresh report (${pendingUtrCount} waiting on a UTR)` : "Refresh report"}
-              title={
-                pendingUtrCount > 0
-                  ? `${pendingUtrCount.toLocaleString("en-IN")} transaction${pendingUtrCount === 1 ? "" : "s"} waiting on a UTR`
-                  : "Refresh report"
-              }
-              className="flex shrink-0 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:text-text-primary disabled:pointer-events-none disabled:opacity-50"
+          {views && (
+            <div
+              role="group"
+              aria-label="Show"
+              className="order-1 flex h-9 w-full items-center gap-0.5 rounded-lg border border-brand-border bg-white p-0.5 lg:w-auto"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={cn(state.status === "loading" && "animate-spin")}
-                aria-hidden="true"
-              >
-                <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
-                <path d="M18 3v5h-5M6 21v-5h5" />
-              </svg>
-              Refresh
-              {pendingUtrCount > 0 && (
-                <span className="rounded-full bg-brand-light px-1.5 text-[10px] tabular-nums text-text-secondary">
-                  {pendingUtrCount > 99 ? "99+" : pendingUtrCount.toLocaleString("en-IN")}
-                </span>
-              )}
-            </button>
-          </div>
+              {views.map((view) => {
+                const active = view.id === activeView?.id;
+                const count = table ? (view.match ? table.rows.filter(view.match).length : table.rows.length) : null;
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      setViewId(view.id);
+                      setPage(0);
+                    }}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors lg:flex-none",
+                      active ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
+                    )}
+                  >
+                    {view.label}
+                    {count != null && (
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 text-[10px] tabular-nums",
+                          active ? "bg-white/20 text-white" : "bg-brand-light text-text-secondary",
+                        )}
+                      >
+                        {count.toLocaleString("en-IN")}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="relative order-2 min-w-0 flex-1 md:w-56 md:flex-none xl:w-72">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"

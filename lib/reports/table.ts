@@ -32,6 +32,19 @@ export type TextFormat = "code" | "words";
 /** Header text: "Account / IFSC" for a column with a second field. */
 export const columnTitle = (column: ColumnInfo) => (column.subLabel ? `${column.label} / ${column.subLabel}` : column.label);
 
+// Transfer only: Success with no (or no valid) UTR yet is the one state worth a manual re-check.
+// Placeholder values the vendor sends instead of a real bank UTR — not just a blank field.
+const IMPROPER_UTR = /^(-|0+|n\/?a|null|nil|pending|tbd|na)$/i;
+
+/** A real bank UTR is exactly 12 digits; anything else (blank, placeholder, wrong length) isn't proper. */
+export function isProperUtr(utr: string | undefined): boolean {
+  const value = (utr ?? "").trim();
+  if (!value || IMPROPER_UTR.test(value)) return false;
+  return /^\d{12}$/.test(value);
+}
+
+export const isRefreshableTransfer = (row: ReportRow) => row.TxnStatus === "Success" && !isProperUtr(row.UTR);
+
 const isZero = (value: string) => !value || Number(value.replace(/,/g, "")) === 0;
 
 /** The value shown in a cell: for a combined credit/debit Amount, whichever of the two is non-zero. */
