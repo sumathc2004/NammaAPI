@@ -735,11 +735,11 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                   ? `${pendingUtrCount.toLocaleString("en-IN")} transaction${pendingUtrCount === 1 ? "" : "s"} waiting on a UTR`
                   : "Refresh report"
               }
-              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-brand-light hover:text-brand-primary disabled:pointer-events-none disabled:opacity-50"
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:text-text-primary disabled:pointer-events-none disabled:opacity-50"
             >
               <svg
-                width="16"
-                height="16"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -752,12 +752,10 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                 <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
                 <path d="M18 3v5h-5M6 21v-5h5" />
               </svg>
+              Refresh
               {pendingUtrCount > 0 && (
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-failed px-1 text-[9px] font-semibold leading-none text-white"
-                >
-                  {pendingUtrCount > 99 ? "99+" : pendingUtrCount}
+                <span className="rounded-full bg-brand-light px-1.5 text-[10px] tabular-nums text-text-secondary">
+                  {pendingUtrCount > 99 ? "99+" : pendingUtrCount.toLocaleString("en-IN")}
                 </span>
               )}
             </button>
