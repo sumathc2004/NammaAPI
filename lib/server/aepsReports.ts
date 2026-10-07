@@ -2,7 +2,7 @@ import "server-only";
 import { aepsRequest } from "@/lib/server/aepsClient";
 import type { DashboardSectionId } from "@/lib/data/dashboardNav";
 import { REPORTS_START_DATE, toIsoDate } from "@/lib/reports/dates";
-import { parseDate, type ReportRow, type ReportTable } from "@/lib/reports/table";
+import { hasStaleQueuedStatus, parseDate, type ReportRow, type ReportTable } from "@/lib/reports/table";
 import type { SessionCredentials } from "@/lib/server/session";
 
 type ReportEndpoint = {
@@ -100,6 +100,8 @@ const REPORT_ENDPOINTS: Partial<Record<DashboardSectionId, ReportEndpoint>> = {
         // "COMPLETED" → "Completed"
         next.Remarks = next.Remarks[0] + next.Remarks.slice(1).toLowerCase();
       }
+      // Dequeued rows become refundable, but the vendor can keep saying "In Queue".
+      if (hasStaleQueuedStatus(next)) next.TxnStatus = "Refundable";
       // No bank UTR yet: refunded rows send "-", queued ones repeat their own UniqueTxnId.
       if (next.UTR === "-" || (next.UTR && next.UTR === next.UniqueTxnId)) next.UTR = "";
       // Names arrive as "Mrs_SUMA_D".

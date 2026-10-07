@@ -49,12 +49,21 @@ function rowFlag(row: ReportRow, names: string[]): boolean {
 /** Transfer statuses that mean "not processed yet". */
 const QUEUED_STATUS = /^(queued?|in ?queue|pending|initiated|processing|in ?process|on ?hold|hold)$/i;
 
-/** Transfer only: queued for processing — seen live as TxnStatus "In Queue", or a dequeue/queue flag. */
-export const isQueuedTransfer = (row: ReportRow) =>
-  rowFlag(row, ["dequeue", "addtoqueue", "dequeueenable"]) || QUEUED_STATUS.test(row.TxnStatus ?? "");
-
 /** Transfer only: eligible for a refund (CanRefund "yes", confirmed; also seen as canbeRefund). */
 export const isRefundableTransfer = (row: ReportRow) => rowFlag(row, ["canrefund", "canberefund"]);
+
+/**
+ * Transfer only: queued for processing — seen live as TxnStatus "In Queue", or a dequeue/queue
+ * flag. A refundable row has already left the queue (it was dequeued), even though the vendor's
+ * status text can still say "In Queue", so refundable wins.
+ */
+export const isQueuedTransfer = (row: ReportRow) =>
+  !isRefundableTransfer(row) &&
+  (rowFlag(row, ["dequeue", "addtoqueue", "dequeueenable"]) || QUEUED_STATUS.test(row.TxnStatus ?? ""));
+
+/** Transfer only: the vendor still says "In Queue" for a row that is refundable — shown as Refundable instead. */
+export const hasStaleQueuedStatus = (row: ReportRow) =>
+  isRefundableTransfer(row) && QUEUED_STATUS.test(row.TxnStatus ?? "");
 
 // Placeholder values the vendor sends instead of a real bank UTR — not just a blank field.
 const IMPROPER_UTR = /^(-|0+|n\/?a|null|nil|pending|tbd|na)$/i;
@@ -87,6 +96,7 @@ export function applyTransferActionPatch(action: TransferAction, row: ReportRow)
     clear(["dequeue", "addtoqueue", "dequeueenable"]);
     next.TxnStatus = "Dequeued";
   } else if (action === "enqueue") {
+    clear(["canrefund", "canberefund"]);
     next.TxnStatus = "In Queue";
   } else {
     clear(["canrefund", "canberefund"]);

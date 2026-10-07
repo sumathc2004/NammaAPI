@@ -66,6 +66,7 @@ const STATUS_STYLES: Record<string, string> = {
   "in queue": "bg-status-pending-bg text-status-pending",
   queued: "bg-status-pending-bg text-status-pending",
   dequeued: "bg-status-cancelled-bg text-status-cancelled",
+  refundable: "bg-status-processing-bg text-status-processing",
   processing: "bg-status-processing-bg text-status-processing",
   cancelled: "bg-status-cancelled-bg text-status-cancelled",
   refunded: "bg-status-cancelled-bg text-status-cancelled",
