@@ -49,6 +49,12 @@ function rowFlag(row: ReportRow, names: string[]): boolean {
 /** Transfer statuses that mean "not processed yet". */
 const QUEUED_STATUS = /^(queued?|in ?queue|pending|initiated|processing|in ?process|on ?hold|hold)$/i;
 
+/**
+ * Transfer statuses that are final: such a row is never "in the queue", whatever its queue flag
+ * says (the vendor leaves the flag set on refunded rows, e.g. the "…R1" refund records).
+ */
+const FINISHED_STATUS = /^(success(ful)?|failed?|failure|refunded|reversed|cancelled|dequeued)$/i;
+
 /** Transfer only: eligible for a refund (CanRefund "yes", confirmed; also seen as canbeRefund). */
 export const isRefundableTransfer = (row: ReportRow) => rowFlag(row, ["canrefund", "canberefund"]);
 
@@ -59,6 +65,7 @@ export const isRefundableTransfer = (row: ReportRow) => rowFlag(row, ["canrefund
  */
 export const isQueuedTransfer = (row: ReportRow) =>
   !isRefundableTransfer(row) &&
+  !FINISHED_STATUS.test(row.TxnStatus ?? "") &&
   (rowFlag(row, ["dequeue", "addtoqueue", "dequeueenable"]) || QUEUED_STATUS.test(row.TxnStatus ?? ""));
 
 /** Transfer only: the vendor still says "In Queue" for a row that is refundable — shown as Refundable instead. */
