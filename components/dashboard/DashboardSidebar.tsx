@@ -36,11 +36,13 @@ function rowIconClasses(active = false) {
   return cn("h-4.5 w-4.5 shrink-0 transition-colors", active ? "text-brand-accent" : "text-white/45 group-hover:text-white/80");
 }
 
-function GroupLabel({ children, collapsed }: { children: ReactNode; collapsed: boolean }) {
-  return collapsed ? (
-    <span className="sr-only">{children}</span>
-  ) : (
-    <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">{children}</p>
+function GroupLabel({ children, collapsed, action }: { children: ReactNode; collapsed: boolean; action?: ReactNode }) {
+  if (collapsed) return <span className="sr-only">{children}</span>;
+  return (
+    <div className="mb-1.5 flex items-center justify-between px-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">{children}</p>
+      {action}
+    </div>
   );
 }
 
@@ -50,12 +52,16 @@ type SidebarGroupProps = {
   collapsed: boolean;
   pathname: string;
   onNavigate?: () => void;
+  /** Rendered to the right of the group title (e.g. the desktop close button next to "Menu"). */
+  titleAction?: ReactNode;
 };
 
-function SidebarGroup({ title, sections, collapsed, pathname, onNavigate }: SidebarGroupProps) {
+function SidebarGroup({ title, sections, collapsed, pathname, onNavigate, titleAction }: SidebarGroupProps) {
   return (
     <div role="group" aria-label={title}>
-      <GroupLabel collapsed={collapsed}>{title}</GroupLabel>
+      <GroupLabel collapsed={collapsed} action={titleAction}>
+        {title}
+      </GroupLabel>
       <ul className="space-y-0.5">
         {sections.map((section) => {
           const href = dashboardPath(section.id);
@@ -89,25 +95,24 @@ export function DashboardSidebar({ collapsed = false, isAdmin = false, onToggleC
   const pathname = usePathname();
   const groupProps = { collapsed, pathname, onNavigate };
 
+  const closeButton = onClose && (
+    <button
+      type="button"
+      onClick={onClose}
+      aria-label="Close menu"
+      title="Close menu"
+      className="flex h-5 w-5 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+
   return (
     <div className="flex h-full flex-col border-r border-white/5 bg-linear-to-b from-brand-navy to-brand-ink">
-      {onClose && (
-        <div className="flex shrink-0 items-center justify-end px-3 pt-3">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close menu"
-            title="Close menu"
-            className="flex h-7 w-7 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-      )}
       <nav aria-label="Dashboard" className="scrollbar-dark flex-1 overflow-y-auto overflow-x-hidden px-3 py-5">
-        <SidebarGroup title="Menu" sections={menuSections} {...groupProps} />
+        <SidebarGroup title="Menu" sections={menuSections} titleAction={closeButton} {...groupProps} />
         {isAdmin && adminSections.length > 0 && (
           <div className="mt-6">
             {collapsed && <div className="mx-3 mb-3 border-t border-white/8" aria-hidden="true" />}
