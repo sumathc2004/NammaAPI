@@ -132,27 +132,42 @@ const isYes = (value = "") => /^(yes|y|true|1)$/i.test(value.trim());
 /** Transfer statuses that mean "not processed yet". */
 const QUEUED_STATUS = /^(queued?|in ?queue|pending|initiated|processing|in ?process|on ?hold|hold)$/i;
 
-// Transfer tabs. Queue: TxnStatus "in queue" (seen live; shown as "In Queue"), plus "dequeue: true"
-// as a guess (not documented by the vendor). Refundable: CanRefund "yes" (confirmed).
+const normalizeFieldName = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * Reads a boolean-ish flag off a row by matching the field name itself (case/separators ignored),
+ * not a fixed key — the vendor has sent this under more than one spelling (e.g. CanRefund vs
+ * canbeRefund, dequeue vs AddToqueue vs dequeueEnable), and silently missing the field means the
+ * tab always shows empty instead of erroring.
+ */
+function rowFlag(row: ReportRow, names: string[]): boolean {
+  return Object.keys(row).some((key) => names.includes(normalizeFieldName(key)) && isYes(row[key]));
+}
+
+// Transfer tabs. Queue: TxnStatus "in queue" (seen live; shown as "In Queue"), or a dequeue/queue
+// flag — the vendor has sent this as dequeue, AddToqueue and dequeueEnable across different
+// responses. Refundable: a can-refund flag (CanRefund, confirmed; also seen as canbeRefund).
 const transferViews: ReportViewTab[] = [
   { id: "all", label: "All" },
   {
     id: "queue",
     label: "Queue",
     emptyText: "No transfers in the queue for this period.",
-    match: (row) => isYes(row.dequeue) || QUEUED_STATUS.test(row.TxnStatus ?? ""),
+    match: (row) => rowFlag(row, ["dequeue", "addtoqueue", "dequeueenable"]) || QUEUED_STATUS.test(row.TxnStatus ?? ""),
   },
   {
     id: "refundable",
     label: "Refundable",
     emptyText: "No refundable transfers for this period.",
-    match: (row) => isYes(row.CanRefund),
+    match: (row) => rowFlag(row, ["canrefund", "canberefund"]),
   },
   {
     id: "needs-refresh",
     label: "Refresh",
     emptyText: "No transfers waiting on a UTR for this period.",
-    match: isRefreshableTransfer,
+    // The vendor's own canRefresh flag, when sent, is authoritative; otherwise fall back to our
+    // own check (Success status with no valid UTR yet).
+    match: (row) => rowFlag(row, ["canrefresh"]) || isRefreshableTransfer(row),
   },
 ];
 
