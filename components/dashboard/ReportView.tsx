@@ -554,6 +554,12 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     return viewRows.filter((row) => columns.some((c) => matches(row, c.key) || matches(row, c.subKey)));
   }, [viewRows, columns, query]);
 
+  // Success rows still waiting on a proper UTR — the count shown on the Refresh button, so it's visible without reloading.
+  const pendingUtrCount = useMemo(
+    () => (section === "transfer" && table ? table.rows.filter(isRefreshableTransfer).length : 0),
+    [section, table],
+  );
+
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
   const pageRows = filteredRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
@@ -723,9 +729,13 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
               type="button"
               onClick={() => apply(range)}
               disabled={state.status === "loading"}
-              aria-label="Refresh report"
-              title="Refresh report"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-brand-light hover:text-brand-primary disabled:pointer-events-none disabled:opacity-50"
+              aria-label={pendingUtrCount > 0 ? `Refresh report (${pendingUtrCount} waiting on a UTR)` : "Refresh report"}
+              title={
+                pendingUtrCount > 0
+                  ? `${pendingUtrCount.toLocaleString("en-IN")} transaction${pendingUtrCount === 1 ? "" : "s"} waiting on a UTR`
+                  : "Refresh report"
+              }
+              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-brand-light hover:text-brand-primary disabled:pointer-events-none disabled:opacity-50"
             >
               <svg
                 width="16"
@@ -742,6 +752,14 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                 <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
                 <path d="M18 3v5h-5M6 21v-5h5" />
               </svg>
+              {pendingUtrCount > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-failed px-1 text-[9px] font-semibold leading-none text-white"
+                >
+                  {pendingUtrCount > 99 ? "99+" : pendingUtrCount}
+                </span>
+              )}
             </button>
           </div>
           <div className="relative order-2 min-w-0 flex-1 md:w-56 md:flex-none xl:w-72">
