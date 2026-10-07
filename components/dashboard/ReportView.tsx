@@ -493,8 +493,10 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
   // Transfer only: a row showing Success with no UTR yet can be re-checked on its own, without
   // reloading the whole table. There's no single-transaction vendor endpoint, so this re-runs the
-  // report for the same range and patches in just that one row.
+  // report for the same range and patches in just that one row — its position in the table never
+  // changes, since only that row's data is swapped in, not the row order.
   const [refreshingTxnId, setRefreshingTxnId] = useState<string | null>(null);
+  const [refreshResult, setRefreshResult] = useState<ReportRow | "not-found" | null>(null);
   async function refreshRow(uniqueTxnId: string) {
     if (refreshingTxnId) return;
     setRefreshingTxnId(uniqueTxnId);
@@ -508,12 +510,18 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
               ? { ...prev, table: { ...prev.table, rows: prev.table.rows.map((r) => (r.UniqueTxnId === uniqueTxnId ? updated : r)) } }
               : prev,
           );
+          setRefreshResult(updated);
+        } else {
+          setRefreshResult("not-found");
         }
+      } else {
+        setRefreshResult("not-found");
       }
     } finally {
       setRefreshingTxnId(null);
     }
   }
+
 
   const table = state.status === "ready" ? state.table : null;
   const layout = reportLayouts[section];
@@ -867,6 +875,101 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
         )}
 
       </div>
+
+      {refreshResult && <RefreshResultDialog result={refreshResult} onClose={() => setRefreshResult(null)} />}
     </div>
+  );
+}
+
+/** Shown after a per-row Refresh completes: the transaction's latest status, UTR and beneficiary. */
+function RefreshResultDialog({ result, onClose }: { result: ReportRow | "not-found"; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const notFound = result === "not-found";
+  const row = notFound ? null : result;
+  const status = row?.TxnStatus ?? "";
+
+  // Opens as a modal on mount, same as OtpDialog — no close() in cleanup, since React's dev-mode
+  // double-mount would otherwise fire the "close" event and dismiss it immediately.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === dialogRef.current) onClose();
+      }}
+      aria-labelledby="refresh-result-title"
+      className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="refresh-result-title" className="text-base font-semibold text-text-primary">
+          Transaction Status
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-brand-light hover:text-text-primary"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      {notFound || !row ? (
+        <p className="mt-4 text-sm text-text-secondary">
+          This transaction wasn&apos;t found in the latest report for the selected dates. It may have moved outside
+          the current date range.
+        </p>
+      ) : (
+        <dl className="mt-4 space-y-3 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Txn ID</dt>
+            <dd className="min-w-0 truncate font-mono text-xs text-text-primary">{row.UniqueTxnId || "—"}</dd>
+          </div>
+          {row.BeneficiaryName && (
+            <div className="flex items-center justify-between gap-4">
+              <dt className="shrink-0 text-text-secondary">Beneficiary</dt>
+              <dd className="min-w-0 truncate text-right text-text-primary">{row.BeneficiaryName}</dd>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Status</dt>
+            <dd>
+              <span
+                className={cn(
+                  "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase",
+                  STATUS_STYLES[status.toLowerCase()] ?? "bg-brand-light text-text-secondary",
+                )}
+              >
+                {status || "—"}
+              </span>
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">UTR</dt>
+            <dd className="min-w-0 truncate text-right font-mono text-xs text-text-primary">
+              {row.UTR || "Not available yet"}
+            </dd>
+          </div>
+        </dl>
+      )}
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+      >
+        Close
+      </button>
+    </dialog>
   );
 }
