@@ -73,6 +73,28 @@ export function isProperUtr(utr: string | undefined): boolean {
 export const isRefreshableTransfer = (row: ReportRow) =>
   rowFlag(row, ["canrefresh"]) || (row.TxnStatus === "Success" && !isProperUtr(row.UTR));
 
+/**
+ * Transfer only: best-effort local update after a successful Dequeue/Enqueue/Refund, so the row's
+ * badge and buttons change immediately — the vendor's action endpoints return only a status
+ * message, not the row's new data, and re-fetching the report may lag behind the action.
+ */
+export function applyTransferActionPatch(action: TransferAction, row: ReportRow): ReportRow {
+  const next = { ...row };
+  const clear = (names: string[]) => {
+    for (const key of Object.keys(next)) if (names.includes(normalizeFieldName(key))) next[key] = "";
+  };
+  if (action === "dequeue") {
+    clear(["dequeue", "addtoqueue", "dequeueenable"]);
+    next.TxnStatus = "Dequeued";
+  } else if (action === "enqueue") {
+    next.TxnStatus = "In Queue";
+  } else {
+    clear(["canrefund", "canberefund"]);
+    next.TxnStatus = "Refunded";
+  }
+  return next;
+}
+
 /** Transfer only: the vendor's internal id for this row (field name varies), used by row actions like dequeue. */
 export function transferRowId(row: ReportRow): string | undefined {
   const key = Object.keys(row).find((k) => normalizeFieldName(k) === "id");

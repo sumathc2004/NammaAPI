@@ -9,6 +9,7 @@ import { REPORTS_START_DATE, toIsoDate, validateRange } from "@/lib/reports/date
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import {
   amountTone,
+  applyTransferActionPatch,
   cellValue,
   columnTitle,
   dateCellText,
@@ -64,6 +65,7 @@ const STATUS_STYLES: Record<string, string> = {
   pending: "bg-status-pending-bg text-status-pending",
   "in queue": "bg-status-pending-bg text-status-pending",
   queued: "bg-status-pending-bg text-status-pending",
+  dequeued: "bg-status-cancelled-bg text-status-cancelled",
   processing: "bg-status-processing-bg text-status-processing",
   cancelled: "bg-status-cancelled-bg text-status-cancelled",
   refunded: "bg-status-cancelled-bg text-status-cancelled",
@@ -629,6 +631,17 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       const data = await response.json().catch(() => null);
       if (response.ok && data?.ok) {
         setActionResult({ action, status: "ok", message: data.message || "Done.", id });
+        setState((prev) =>
+          prev.status === "ready"
+            ? {
+                ...prev,
+                table: {
+                  ...prev.table,
+                  rows: prev.table.rows.map((r) => (r.UniqueTxnId === uniqueTxnId ? applyTransferActionPatch(action, r) : r)),
+                },
+              }
+            : prev,
+        );
       } else {
         setActionResult({ action, status: "error", error: data?.error || "The request could not be completed.", id });
       }
