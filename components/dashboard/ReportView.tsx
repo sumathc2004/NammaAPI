@@ -574,12 +574,15 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   // data comes back (just a status/message), so this doesn't touch the table — only confirms it worked.
   const [dequeuingTxnId, setDequeuingTxnId] = useState<string | null>(null);
   const [dequeueResult, setDequeueResult] = useState<
-    { status: "pending" } | { status: "ok"; message: string } | { status: "error"; error: string } | null
+    | { status: "pending"; id: string }
+    | { status: "ok"; message: string; id: string }
+    | { status: "error"; error: string; id: string }
+    | null
   >(null);
   async function dequeueRow(uniqueTxnId: string, id: string) {
     if (dequeuingTxnId) return;
     setDequeuingTxnId(uniqueTxnId);
-    setDequeueResult({ status: "pending" });
+    setDequeueResult({ status: "pending", id });
     try {
       const response = await fetch("/api/dashboard/transfer/dequeue", {
         method: "POST",
@@ -588,12 +591,12 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       });
       const data = await response.json().catch(() => null);
       if (response.ok && data?.ok) {
-        setDequeueResult({ status: "ok", message: data.message || "Dequeue updated." });
+        setDequeueResult({ status: "ok", message: data.message || "Dequeue updated.", id });
       } else {
-        setDequeueResult({ status: "error", error: data?.error || "The transaction could not be dequeued." });
+        setDequeueResult({ status: "error", error: data?.error || "The transaction could not be dequeued.", id });
       }
     } catch {
-      setDequeueResult({ status: "error", error: "The transaction could not be dequeued." });
+      setDequeueResult({ status: "error", error: "The transaction could not be dequeued.", id });
     } finally {
       setDequeuingTxnId(null);
     }
@@ -970,7 +973,10 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   );
 }
 
-type DequeueResult = { status: "pending" } | { status: "ok"; message: string } | { status: "error"; error: string };
+type DequeueResult =
+  | { status: "pending"; id: string }
+  | { status: "ok"; message: string; id: string }
+  | { status: "error"; error: string; id: string };
 
 /** Shows "Requesting…" the instant Dequeue is clicked, then the vendor's own confirmation or error (no row data comes back). */
 function DequeueResultDialog({ result, onClose }: { result: DequeueResult; onClose: () => void }) {
@@ -1034,6 +1040,9 @@ function DequeueResultDialog({ result, onClose }: { result: DequeueResult; onClo
           : result.status === "ok"
             ? result.message
             : result.error}
+      </p>
+      <p className="mt-1.5 text-xs text-text-secondary">
+        Id: <span className="font-mono">{result.id}</span>
       </p>
       {result.status !== "pending" && (
         <button
