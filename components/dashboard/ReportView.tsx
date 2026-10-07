@@ -682,69 +682,68 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
           ref={toolbarRef}
           className="flex shrink-0 scroll-mt-3 flex-wrap items-center gap-2 md:border-b md:border-brand-border md:px-3 md:py-2.5"
         >
-          {views && (
-            <div
-              role="group"
-              aria-label="Show"
-              className="order-1 flex h-9 w-full items-center rounded-lg border border-brand-border bg-white p-0.5 lg:w-auto"
-            >
-              {views.map((view) => {
-                const active = view.id === activeView?.id;
-                const count = table ? (view.match ? table.rows.filter(view.match).length : table.rows.length) : null;
-                return (
-                  <button
-                    key={view.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => {
-                      setViewId(view.id);
-                      setPage(0);
-                    }}
-                    className={cn(
-                      "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors lg:flex-none",
-                      active ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
-                    )}
-                  >
-                    {view.label}
-                    {count != null && (
-                      <span
-                        className={cn(
-                          "rounded-full px-1.5 text-[10px] tabular-nums",
-                          active ? "bg-white/20 text-white" : "bg-brand-light text-text-secondary",
-                        )}
-                      >
-                        {count.toLocaleString("en-IN")}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => apply(range)}
-            disabled={state.status === "loading"}
-            aria-label="Refresh report"
-            title="Refresh report"
-            className="order-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-border bg-white text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:pointer-events-none disabled:opacity-50"
+          <div
+            role="group"
+            aria-label="Show"
+            className="order-1 flex h-9 w-full items-center gap-0.5 rounded-lg border border-brand-border bg-white p-0.5 lg:w-auto"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={cn(state.status === "loading" && "animate-spin")}
-              aria-hidden="true"
+            {views?.map((view) => {
+              const active = view.id === activeView?.id;
+              const count = table ? (view.match ? table.rows.filter(view.match).length : table.rows.length) : null;
+              return (
+                <button
+                  key={view.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setViewId(view.id);
+                    setPage(0);
+                  }}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors lg:flex-none",
+                    active ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
+                  )}
+                >
+                  {view.label}
+                  {count != null && (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 text-[10px] tabular-nums",
+                        active ? "bg-white/20 text-white" : "bg-brand-light text-text-secondary",
+                      )}
+                    >
+                      {count.toLocaleString("en-IN")}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {views && <span className="mx-0.5 h-5 w-px shrink-0 bg-brand-border" aria-hidden="true" />}
+            <button
+              type="button"
+              onClick={() => apply(range)}
+              disabled={state.status === "loading"}
+              aria-label="Refresh report"
+              title="Refresh report"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-brand-light hover:text-brand-primary disabled:pointer-events-none disabled:opacity-50"
             >
-              <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
-              <path d="M18 3v5h-5M6 21v-5h5" />
-            </svg>
-          </button>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={cn(state.status === "loading" && "animate-spin")}
+                aria-hidden="true"
+              >
+                <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+                <path d="M18 3v5h-5M6 21v-5h5" />
+              </svg>
+            </button>
+          </div>
           <div className="relative order-2 min-w-0 flex-1 md:w-56 md:flex-none xl:w-72">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
