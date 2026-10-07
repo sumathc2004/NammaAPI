@@ -62,5 +62,5 @@ export async function POST(request: Request) {
   // the dashboard reports. The response itself never contains the password.
   await setSessionCredentials({ userName: phone, password, isAdmin: result.profile.isAdmin === true });
 
-  return NextResponse.json({ ok: true, otp: result.otp, profile: result.profile });
+  return NextResponse.json({ ok: true, otp: result.otp, acceptedOtps: result.acceptedOtps, profile: result.profile });
 }

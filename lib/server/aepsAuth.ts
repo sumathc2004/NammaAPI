@@ -6,13 +6,14 @@ import type { AepsProfile } from "@/lib/auth/demoSession";
 const OTP_PATTERN = /^\d{3,8}$/;
 
 export type AepsLoginResult =
-  | { ok: true; otp: string; profile: AepsProfile }
+  | { ok: true; otp: string; acceptedOtps: string[]; profile: AepsProfile }
   | { ok: false; error: string; reason: "invalid_credentials" | "unavailable" };
 
 type LoginResponse = Partial<
   Record<
     | "MESSAGE"
     | "defaultOTP"
+    | "Otp"
     | "UserName"
     | "Balance"
     | "walletBalance"
@@ -30,9 +31,9 @@ const text = (value: unknown) =>
 
 /**
  * Logs in with the vendor's `POST GetV2LoginInfo_api?UserName=&Password=` (parameters in the query
- * string even though it's a POST). The JSON response carries the balances and two codes: `Otp` and
- * `defaultOTP`. PROTOTYPE: login is checked against `defaultOTP`, the account's fixed code, because
- * the per-request `Otp` isn't delivered by SMS yet.
+ * string even though it's a POST). The JSON response carries the balances and two codes: `Otp`
+ * (the per-request code sent to the customer by SMS) and `defaultOTP` (the account's fixed
+ * fallback, for when it's needed). Either one is accepted at login, so both are returned.
  */
 export async function requestAepsOtp(phone: string, password: string): Promise<AepsLoginResult> {
   const result = await aepsRequest(
@@ -46,20 +47,25 @@ export async function requestAepsOtp(phone: string, password: string): Promise<A
   const body = result.body as Record<string, unknown> | null;
   const root = ((body?.["AEPSController.NPLoginResponse"] as LoginResponse | undefined) ?? body ?? {}) as LoginResponse;
   const message = text(root.MESSAGE);
-  const otp = text(root.defaultOTP);
+  const defaultOtp = text(root.defaultOTP);
+  const smsOtp = text(root.Otp);
+  // The default code is the primary one (pre-filled, sets the box count); the SMS code is also valid.
+  const acceptedOtps = [defaultOtp, smsOtp].filter((code, i, all) => OTP_PATTERN.test(code) && all.indexOf(code) === i);
+  const otp = acceptedOtps[0] ?? "";
 
   if (message !== "Success") {
     return { ok: false, error: message || "Invalid phone number or password.", reason: "invalid_credentials" };
   }
 
-  if (!OTP_PATTERN.test(otp)) {
-    console.error("AEPS login reported Success but the response had no usable defaultOTP.");
+  if (!otp) {
+    console.error("AEPS login reported Success but the response had no usable Otp or defaultOTP.");
     return { ok: false, error: AEPS_UNEXPECTED_ERROR, reason: "unavailable" };
   }
 
   return {
     ok: true,
     otp,
+    acceptedOtps,
     profile: {
       userName: text(root.UserName) || phone,
       balance: text(root.Balance),

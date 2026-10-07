@@ -57,6 +57,9 @@ export function OtpDialog({ phone, length, demoOtp, prefill, onVerify, onResend,
   const [digits, setDigits] = useState<string[]>(() =>
     prefill && prefill.length === length ? prefill.split("") : Array(length).fill(""),
   );
+  // True while the boxes still hold the untouched pre-filled code: the first edit replaces it whole
+  // (otherwise typing one digit of a different code would complete a wrong code and verify it).
+  const [untouched, setUntouched] = useState(Boolean(prefill && prefill.length === length));
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
@@ -106,11 +109,11 @@ export function OtpDialog({ phone, length, demoOtp, prefill, onVerify, onResend,
   }
 
   /** Writes one or more digits starting at `index` — covers typing, paste and SMS autofill. */
-  function fillFrom(index: number, value: string) {
+  function fillFrom(index: number, value: string, base: string[] = digits) {
     const chars = value.replace(/\D/g, "").slice(0, length - index).split("");
     if (chars.length === 0) return;
 
-    const next = [...digits];
+    const next = [...base];
     chars.forEach((char, offset) => (next[index + offset] = char));
     setDigits(next);
     setStatus("idle");
@@ -127,6 +130,16 @@ export function OtpDialog({ phone, length, demoOtp, prefill, onVerify, onResend,
 
   function handleChange(index: number, e: ChangeEvent<HTMLInputElement>) {
     const value = e.target.value.replace(/\D/g, "");
+    if (untouched) {
+      setUntouched(false);
+      const typed = value.length === 2 && digits[index] ? (value[0] === digits[index] ? value[1] : value[0]) : value;
+      if (typed) fillFrom(0, typed, Array(length).fill(""));
+      else {
+        setDigits(Array(length).fill(""));
+        focusBox(0);
+      }
+      return;
+    }
     if (!value) {
       const next = [...digits];
       next[index] = "";
@@ -142,7 +155,17 @@ export function OtpDialog({ phone, length, demoOtp, prefill, onVerify, onResend,
   }
 
   function handleKeyDown(index: number, e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Backspace" && !digits[index] && index > 0) {
+    if (untouched && /^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // A digit equal to the one in the box fires no change event, so handle the key itself.
+      e.preventDefault();
+      setUntouched(false);
+      fillFrom(0, e.key, Array(length).fill(""));
+    } else if (untouched && (e.key === "Backspace" || e.key === "Delete")) {
+      e.preventDefault();
+      setUntouched(false);
+      setDigits(Array(length).fill(""));
+      focusBox(0);
+    } else if (e.key === "Backspace" && !digits[index] && index > 0) {
       e.preventDefault();
       const next = [...digits];
       next[index - 1] = "";
@@ -159,6 +182,11 @@ export function OtpDialog({ phone, length, demoOtp, prefill, onVerify, onResend,
 
   function handlePaste(index: number, e: ClipboardEvent<HTMLInputElement>) {
     e.preventDefault();
+    if (untouched) {
+      setUntouched(false);
+      fillFrom(0, e.clipboardData.getData("text"), Array(length).fill(""));
+      return;
+    }
     fillFrom(index, e.clipboardData.getData("text"));
   }
 

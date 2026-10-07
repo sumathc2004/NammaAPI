@@ -17,7 +17,8 @@ const SHOW_DEMO_OTP = false;
 const PREFILL_DEFAULT_OTP = true;
 
 type CredentialErrors = { phoneNumber?: string; password?: string };
-type PendingLogin = { otp: string; profile: AepsProfile };
+/** `otp` is the default code (pre-filled); `acceptedOtps` also holds the SMS code — either one logs in. */
+type PendingLogin = { otp: string; acceptedOtps: string[]; profile: AepsProfile };
 
 export function LoginForm() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export function LoginForm() {
         return data?.error || "We couldn't log you in. Please try again.";
       }
 
-      setPending({ otp: data.otp, profile: data.profile });
+      setPending({ otp: data.otp, acceptedOtps: data.acceptedOtps ?? [data.otp], profile: data.profile });
       return null;
     } catch {
       return "Something went wrong. Please check your connection and try again.";
@@ -65,7 +66,7 @@ export function LoginForm() {
   }
 
   function handleVerify(otp: string): string | null {
-    if (!pending || otp !== pending.otp) return "That code isn't right. Please try again.";
+    if (!pending || !pending.acceptedOtps.includes(otp)) return "That code isn't right. Please try again.";
     saveDemoSession(pending.profile);
     // The server now holds the credentials in its encrypted session cookie; drop the typed password.
     setPassword("");

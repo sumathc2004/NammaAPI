@@ -143,7 +143,7 @@ Known gaps — fix all of them before real users log in:
 - The session cookie is set as soon as the vendor accepts the password, before the OTP step, and the OTP is checked only in the browser. Verify the OTP on the server and set the cookie only after it matches.
 - The dashboard's "logged in" check reads `sessionStorage`; the real authority is the session cookie (report routes return 401 without it).
 - The vendor API takes the password as a query parameter (even on the POST login endpoint), so it appears in this server's outbound URLs. Never log those URLs; ask the vendor to accept credentials in the request body.
-- `PREFILL_DEFAULT_OTP` (on) in `app/(auth)/login/LoginForm.tsx` pre-fills the OTP boxes with the expected code, so login is Verify-only — turn it off before real users log in.
+- Login accepts either code the vendor returns: `Otp` (the per-request code sent to the customer by SMS) or `defaultOTP` (the fixed fallback) — `acceptedOtps` in the login response; the default one is also what gets pre-filled. `PREFILL_DEFAULT_OTP` (on) in `app/(auth)/login/LoginForm.tsx` pre-fills the OTP boxes with the expected code, so login is Verify-only — turn it off before real users log in.
 - `SHOW_DEMO_OTP` in `app/(auth)/login/LoginForm.tsx` prints the expected OTP inside the modal when set to `true`.
 - Vendor-side: `GetTxnsByDate` and `BpPayment/GetLinksByDate` need no password — anyone who knows a mobile number can fetch that account's AEPS transactions (including full Aadhaar numbers) and card payment collections (customer names, amounts) directly from the vendor. This app only ever passes the session's own number and masks Aadhaar, but the endpoint itself should require authentication.
 
