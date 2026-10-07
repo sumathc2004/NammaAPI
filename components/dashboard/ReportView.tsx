@@ -417,17 +417,15 @@ function Pager({
   );
 }
 
-/** Transfer only: Success with no UTR yet is the one state worth a manual re-check. */
+/** Transfer only: Success with no (or no valid) UTR yet is the one state worth a manual re-check. */
 // Placeholder values the vendor sends instead of a real bank UTR — not just a blank field.
 const IMPROPER_UTR = /^(-|0+|n\/?a|null|nil|pending|tbd|na)$/i;
 
-/** Whether `utr` looks like a real bank reference rather than a blank/placeholder one. */
+/** A real bank UTR is exactly 12 digits; anything else (blank, placeholder, wrong length) isn't proper. */
 function isProperUtr(utr: string | undefined): boolean {
   const value = (utr ?? "").trim();
-  if (!value) return false;
-  if (IMPROPER_UTR.test(value)) return false;
-  // Real UTR/reference numbers run well into double digits; anything shorter is placeholder-shaped.
-  return value.length >= 6;
+  if (!value || IMPROPER_UTR.test(value)) return false;
+  return /^\d{12}$/.test(value);
 }
 
 const isRefreshableTransfer = (row: ReportRow) => row.TxnStatus === "Success" && !isProperUtr(row.UTR);
