@@ -227,9 +227,14 @@ export async function fetchReport(
   const columns = [...raw.columns];
   for (const row of rows) for (const key of Object.keys(row)) if (!columns.includes(key)) columns.push(key);
   const table: ReportTable = { columns, rows };
-  if (process.env.NODE_ENV === "development") {
-    // Field names only (no values), to help map columns in lib/reports/layouts.ts.
-    console.info(`AEPS ${endpoint} fields: ${table.columns.join(", ")}`);
+  // Field names only (no values), to help map columns in lib/reports/layouts.ts — logged in every
+  // environment since the vendor has silently added/renamed fields in production before.
+  console.info(`AEPS ${endpoint} fields: ${table.columns.join(", ")}`);
+  if (section === "transfer" && rows[0]) {
+    // Diagnosing the Dequeue action sending the wrong field as the row id: ids aren't sensitive
+    // (unlike the account/UTR/mobile fields on the same row), so safe to log their values here.
+    const idLike = Object.entries(rows[0]).filter(([key]) => /id/i.test(key));
+    console.info(`AEPS ${endpoint} id-like fields on first row: ${JSON.stringify(Object.fromEntries(idLike))}`);
   }
   return { ok: true, table };
 }
