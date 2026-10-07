@@ -1,5 +1,5 @@
 import type { DashboardSectionId } from "@/lib/data/dashboardNav";
-import { isQueuedTransfer, isRefreshableTransfer, isRefundableTransfer, type ColumnSlot, type ReportRow } from "@/lib/reports/table";
+import { isQueuedTransfer, isRefreshableTransfer, isRefundableTransfer, isRefundedTransfer, type ColumnSlot, type ReportRow } from "@/lib/reports/table";
 
 // Fixed column layouts for report sections, in display order. Each slot lists the vendor field
 // names it accepts (lowercased, separators removed), most specific first. Sections without a
@@ -137,6 +137,12 @@ const transferViews: ReportViewTab[] = [
     label: "Refundable",
     emptyText: "No refundable transfers for this period.",
     match: isRefundableTransfer,
+  },
+  {
+    id: "refunded",
+    label: "Refunded",
+    emptyText: "No refunded transfers for this period.",
+    match: isRefundedTransfer,
   },
   {
     id: "needs-refresh",

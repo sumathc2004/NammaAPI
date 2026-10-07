@@ -55,6 +55,9 @@ const QUEUED_STATUS = /^(queued?|in ?queue|pending|initiated|processing|in ?proc
  */
 const FINISHED_STATUS = /^(success(ful)?|failed?|failure|refunded|reversed|cancelled|dequeued)$/i;
 
+/** Transfer only: already refunded (the server sets the status to "Refunded" for the vendor's refund records). */
+export const isRefundedTransfer = (row: ReportRow) => /^refunded$/i.test((row.TxnStatus ?? "").trim());
+
 /** Transfer only: eligible for a refund (CanRefund "yes", confirmed; also seen as canbeRefund). */
 export const isRefundableTransfer = (row: ReportRow) => rowFlag(row, ["canrefund", "canberefund"]);
 

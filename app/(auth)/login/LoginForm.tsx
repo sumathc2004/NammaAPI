@@ -14,7 +14,7 @@ import { OtpDialog } from "./OtpDialog";
 const SHOW_DEMO_OTP = false;
 
 /** PROTOTYPE: pre-fill the OTP boxes with the account's defaultOTP, so login is Verify-only. */
-const PREFILL_DEFAULT_OTP = true;
+const PREFILL_DEFAULT_OTP = false;
 
 type CredentialErrors = { phoneNumber?: string; password?: string };
 /** `otp` is the default code (pre-filled); `acceptedOtps` also holds the SMS code — either one logs in. */
