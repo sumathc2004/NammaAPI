@@ -4,6 +4,9 @@
 export type ReportRow = Record<string, string>;
 export type ReportTable = { columns: string[]; rows: ReportRow[] };
 
+/** The vendor's per-transaction transfer actions (shared by the client UI and the server routes). */
+export type TransferAction = "dequeue" | "enqueue" | "refund";
+
 export type ColumnKind = "amount" | "date" | "entryType" | "status" | "text";
 export type AmountTone = "credit" | "debit" | "neutral";
 

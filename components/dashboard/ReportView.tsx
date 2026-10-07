@@ -16,6 +16,7 @@ import {
   formatAmount,
   isQueuedTransfer,
   isRefreshableTransfer,
+  isRefundableTransfer,
   layoutColumns,
   sumColumn,
   toCsv,
@@ -23,6 +24,7 @@ import {
   type ColumnInfo,
   type ReportRow,
   type ReportTable,
+  type TransferAction,
 } from "@/lib/reports/table";
 import { reportLayouts, reportViews } from "@/lib/reports/layouts";
 import { cn } from "@/lib/cn";
@@ -251,21 +253,23 @@ function RowCard({
   section,
   refreshingTxnId,
   onRefresh,
-  dequeuingTxnId,
-  onDequeue,
+  pendingAction,
+  onAction,
 }: {
   row: ReportRow;
   layout: CardLayout;
   section: DashboardSectionId;
   refreshingTxnId: string | null;
   onRefresh: (uniqueTxnId: string) => void;
-  dequeuingTxnId: string | null;
-  onDequeue: (uniqueTxnId: string, id: string) => void;
+  pendingAction: { uniqueTxnId: string; action: TransferAction } | null;
+  onAction: (action: TransferAction, uniqueTxnId: string, id: string) => void;
 }) {
   const { title, date, amount, badges, details, codes } = layout;
   const refreshable = section === "transfer" && isRefreshableTransfer(row);
   const presentCodes = codes.filter((c) => row[c.key] || (refreshable && c.label === "UTR"));
   const queueId = section === "transfer" && isQueuedTransfer(row) ? transferRowId(row) : undefined;
+  const refundId = section === "transfer" && isRefundableTransfer(row) ? transferRowId(row) : undefined;
+  const isPending = (action: TransferAction) => pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === action;
 
   return (
     <li className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-sm">
@@ -297,10 +301,13 @@ function RowCard({
               </span>
             )}
             {queueId && (
-              <DequeueButton
-                dequeuing={dequeuingTxnId === row.UniqueTxnId}
-                onDequeue={() => onDequeue(row.UniqueTxnId, queueId)}
-              />
+              <TransferActionButton action="dequeue" pending={isPending("dequeue")} onClick={() => onAction("dequeue", row.UniqueTxnId, queueId)} />
+            )}
+            {refundId && (
+              <TransferActionButton action="enqueue" pending={isPending("enqueue")} onClick={() => onAction("enqueue", row.UniqueTxnId, refundId)} />
+            )}
+            {refundId && (
+              <TransferActionButton action="refund" pending={isPending("refund")} onClick={() => onAction("refund", row.UniqueTxnId, refundId)} />
             )}
           </div>
         )}
@@ -461,14 +468,29 @@ function RefreshUtrButton({ refreshing, onRefresh }: { refreshing: boolean; onRe
   );
 }
 
-function DequeueButton({ dequeuing, onDequeue }: { dequeuing: boolean; onDequeue: () => void }) {
+const TRANSFER_ACTION_LABELS: Record<TransferAction, { label: string; ariaLabel: string }> = {
+  dequeue: { label: "Dequeue", ariaLabel: "Remove from queue" },
+  enqueue: { label: "Enqueue", ariaLabel: "Add to queue" },
+  refund: { label: "Refund", ariaLabel: "Process refund" },
+};
+
+function TransferActionButton({
+  action,
+  pending,
+  onClick,
+}: {
+  action: TransferAction;
+  pending: boolean;
+  onClick: () => void;
+}) {
+  const { label, ariaLabel } = TRANSFER_ACTION_LABELS[action];
   return (
     <button
       type="button"
-      onClick={onDequeue}
-      disabled={dequeuing}
-      aria-label="Remove from queue"
-      title="Remove from queue"
+      onClick={onClick}
+      disabled={pending}
+      aria-label={ariaLabel}
+      title={ariaLabel}
       className="inline-flex items-center gap-1.5 rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50"
     >
       <svg
@@ -480,20 +502,33 @@ function DequeueButton({ dequeuing, onDequeue }: { dequeuing: boolean; onDequeue
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className={cn("shrink-0", dequeuing && "animate-spin")}
+        className={cn("shrink-0", pending && "animate-spin")}
         aria-hidden="true"
       >
-        {dequeuing ? (
+        {pending ? (
           <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5M18 3v5h-5M6 21v-5h5" />
-        ) : (
+        ) : action === "dequeue" ? (
           <>
             <path d="M5 12h11" />
             <path d="M12 7l5 5-5 5" />
             <path d="M19 5v14" />
           </>
+        ) : action === "enqueue" ? (
+          <>
+            <path d="M19 12H8" />
+            <path d="M12 7l-5 5 5 5" />
+            <path d="M5 5v14" />
+          </>
+        ) : (
+          <>
+            <path d="M3 10a7 7 0 0 1 12-5l2 2" />
+            <path d="M17 3v4h-4" />
+            <path d="M21 14a7 7 0 0 1-12 5l-2-2" />
+            <path d="M7 21v-4h4" />
+          </>
         )}
       </svg>
-      Dequeue
+      {label}
     </button>
   );
 }
@@ -570,35 +605,36 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     }
   }
 
-  // Transfer only: removes a queued transfer from the vendor's processing queue. No single-row
-  // data comes back (just a status/message), so this doesn't touch the table — only confirms it worked.
-  const [dequeuingTxnId, setDequeuingTxnId] = useState<string | null>(null);
-  const [dequeueResult, setDequeueResult] = useState<
-    | { status: "pending"; id: string }
-    | { status: "ok"; message: string; id: string }
-    | { status: "error"; error: string; id: string }
+  // Transfer only: Dequeue/Enqueue/Refund — vendor row actions. No single-row data comes back
+  // (just a status/message), so none of these touch the table — only confirm it worked. A row
+  // can show more than one action at once, so the pending/result state tracks which one.
+  const [pendingAction, setPendingAction] = useState<{ uniqueTxnId: string; action: TransferAction } | null>(null);
+  const [actionResult, setActionResult] = useState<
+    | { action: TransferAction; status: "pending"; id: string }
+    | { action: TransferAction; status: "ok"; message: string; id: string }
+    | { action: TransferAction; status: "error"; error: string; id: string }
     | null
   >(null);
-  async function dequeueRow(uniqueTxnId: string, id: string) {
-    if (dequeuingTxnId) return;
-    setDequeuingTxnId(uniqueTxnId);
-    setDequeueResult({ status: "pending", id });
+  async function runTransferAction(action: TransferAction, uniqueTxnId: string, id: string) {
+    if (pendingAction) return;
+    setPendingAction({ uniqueTxnId, action });
+    setActionResult({ action, status: "pending", id });
     try {
-      const response = await fetch("/api/dashboard/transfer/dequeue", {
+      const response = await fetch(`/api/dashboard/transfer/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
       const data = await response.json().catch(() => null);
       if (response.ok && data?.ok) {
-        setDequeueResult({ status: "ok", message: data.message || "Dequeue updated.", id });
+        setActionResult({ action, status: "ok", message: data.message || "Done.", id });
       } else {
-        setDequeueResult({ status: "error", error: data?.error || "The transaction could not be dequeued.", id });
+        setActionResult({ action, status: "error", error: data?.error || "The request could not be completed.", id });
       }
     } catch {
-      setDequeueResult({ status: "error", error: "The transaction could not be dequeued.", id });
+      setActionResult({ action, status: "error", error: "The request could not be completed.", id });
     } finally {
-      setDequeuingTxnId(null);
+      setPendingAction(null);
     }
   }
 
@@ -887,8 +923,8 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                 section={section}
                 refreshingTxnId={refreshingTxnId}
                 onRefresh={refreshRow}
-                dequeuingTxnId={dequeuingTxnId}
-                onDequeue={dequeueRow}
+                pendingAction={pendingAction}
+                onAction={runTransferAction}
               />
             ))}
           </ul>
@@ -945,13 +981,32 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                             refreshing={refreshingTxnId === row.UniqueTxnId}
                             onRefresh={() => refreshRow(row.UniqueTxnId)}
                           />
-                        ) : section === "transfer" && column.kind === "status" && isQueuedTransfer(row) && transferRowId(row) ? (
+                        ) : section === "transfer" &&
+                          column.kind === "status" &&
+                          ((isQueuedTransfer(row) && transferRowId(row)) || (isRefundableTransfer(row) && transferRowId(row))) ? (
                           <div className="flex flex-col items-start gap-1">
                             <Cell column={column} row={row} variant="table" />
-                            <DequeueButton
-                              dequeuing={dequeuingTxnId === row.UniqueTxnId}
-                              onDequeue={() => dequeueRow(row.UniqueTxnId, transferRowId(row)!)}
-                            />
+                            {isQueuedTransfer(row) && transferRowId(row) && (
+                              <TransferActionButton
+                                action="dequeue"
+                                pending={pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === "dequeue"}
+                                onClick={() => runTransferAction("dequeue", row.UniqueTxnId, transferRowId(row)!)}
+                              />
+                            )}
+                            {isRefundableTransfer(row) && transferRowId(row) && (
+                              <>
+                                <TransferActionButton
+                                  action="enqueue"
+                                  pending={pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === "enqueue"}
+                                  onClick={() => runTransferAction("enqueue", row.UniqueTxnId, transferRowId(row)!)}
+                                />
+                                <TransferActionButton
+                                  action="refund"
+                                  pending={pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === "refund"}
+                                  onClick={() => runTransferAction("refund", row.UniqueTxnId, transferRowId(row)!)}
+                                />
+                              </>
+                            )}
                           </div>
                         ) : (
                           <Cell column={column} row={row} variant="table" />
@@ -968,18 +1023,24 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       </div>
 
       {refreshResult && <RefreshResultDialog result={refreshResult} onClose={() => setRefreshResult(null)} />}
-      {dequeueResult && <DequeueResultDialog result={dequeueResult} onClose={() => setDequeueResult(null)} />}
+      {actionResult && <TransferActionResultDialog result={actionResult} onClose={() => setActionResult(null)} />}
     </div>
   );
 }
 
-type DequeueResult =
-  | { status: "pending"; id: string }
-  | { status: "ok"; message: string; id: string }
-  | { status: "error"; error: string; id: string };
+type TransferActionResult =
+  | { action: TransferAction; status: "pending"; id: string }
+  | { action: TransferAction; status: "ok"; message: string; id: string }
+  | { action: TransferAction; status: "error"; error: string; id: string };
 
-/** Shows "Requesting…" the instant Dequeue is clicked, then the vendor's own confirmation or error (no row data comes back). */
-function DequeueResultDialog({ result, onClose }: { result: DequeueResult; onClose: () => void }) {
+const TRANSFER_ACTION_RESULT_TITLES: Record<TransferAction, { ok: string; error: string }> = {
+  dequeue: { ok: "Removed From Queue", error: "Dequeue Failed" },
+  enqueue: { ok: "Added To Queue", error: "Enqueue Failed" },
+  refund: { ok: "Refund Processed", error: "Refund Failed" },
+};
+
+/** Shows "Requesting…" the instant a row action is clicked, then the vendor's own confirmation or error (no row data comes back). */
+function TransferActionResultDialog({ result, onClose }: { result: TransferActionResult; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -987,7 +1048,7 @@ function DequeueResultDialog({ result, onClose }: { result: DequeueResult; onClo
     if (dialog && !dialog.open) dialog.showModal();
   }, []);
 
-  const title = result.status === "pending" ? "Requesting…" : result.status === "ok" ? "Removed From Queue" : "Dequeue Failed";
+  const title = result.status === "pending" ? "Requesting…" : TRANSFER_ACTION_RESULT_TITLES[result.action][result.status];
 
   return (
     <dialog
@@ -999,11 +1060,11 @@ function DequeueResultDialog({ result, onClose }: { result: DequeueResult; onClo
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      aria-labelledby="dequeue-result-title"
+      aria-labelledby="transfer-action-result-title"
       className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
     >
       <div className="flex items-start justify-between gap-3">
-        <h2 id="dequeue-result-title" className="flex items-center gap-2 text-base font-semibold text-text-primary">
+        <h2 id="transfer-action-result-title" className="flex items-center gap-2 text-base font-semibold text-text-primary">
           {result.status === "pending" && (
             <svg
               width="16"
