@@ -8,7 +8,7 @@ export const MAX_RANGE_DAYS = 366;
  * earlier From date, and fetchReport drops older rows the vendor still returns); the date pickers
  * only mirror it. Changing it needs a code change and a deploy — no request can override it.
  */
-export const REPORTS_START_DATE = "2026-10-05";
+export const REPORTS_START_DATE = "2026-10-07";
 
 /** Local calendar date as "yyyy-MM-dd". */
 export function toIsoDate(date: Date): string {
@@ -29,7 +29,7 @@ export function isIsoDate(value: string): boolean {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-/** "2026-10-05" → "05 Oct 2026" */
+/** "2026-10-07" → "07 Oct 2026" */
 export function formatIsoDate(value: string): string {
   const [y, m, d] = value.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });

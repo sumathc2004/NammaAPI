@@ -615,7 +615,7 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   const [pendingAction, setPendingAction] = useState<{ uniqueTxnId: string; action: TransferAction } | null>(null);
   const [actionResult, setActionResult] = useState<
     | { action: TransferAction; status: "pending"; id: string }
-    | { action: TransferAction; status: "ok"; message: string; id: string }
+    | { action: TransferAction; status: "ok"; message: string; id: string; refreshAt?: number }
     | { action: TransferAction; status: "error"; error: string; id: string }
     | null
   >(null);
@@ -635,6 +635,8 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     reloadTimer.current = setTimeout(async () => {
       const next = await loadReport(section, scheduledFor);
       if (next.status === "ready" && rangeRef.current === scheduledFor) setState(next);
+      // The popup stays up (and locked) until the reload has finished.
+      setActionResult((r) => (r?.status === "ok" && r.refreshAt ? null : r));
     }, 10_000);
   }
   async function runTransferAction(action: TransferAction, uniqueTxnId: string, id: string) {
@@ -649,7 +651,13 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       });
       const data = await response.json().catch(() => null);
       if (response.ok && data?.ok) {
-        setActionResult({ action, status: "ok", message: data.message || "Done.", id });
+        setActionResult({
+          action,
+          status: "ok",
+          message: data.message || "Done.",
+          id,
+          refreshAt: action === "dequeue" ? Date.now() + 10_000 : undefined,
+        });
         if (action === "dequeue") scheduleQuietReload();
         setState((prev) =>
           prev.status === "ready"
@@ -1066,7 +1074,7 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
 type TransferActionResult =
   | { action: TransferAction; status: "pending"; id: string }
-  | { action: TransferAction; status: "ok"; message: string; id: string }
+  | { action: TransferAction; status: "ok"; message: string; id: string; refreshAt?: number }
   | { action: TransferAction; status: "error"; error: string; id: string };
 
 const TRANSFER_ACTION_RESULT_TITLES: Record<TransferAction, { ok: string; error: string }> = {
@@ -1084,6 +1092,18 @@ function TransferActionResultDialog({ result, onClose }: { result: TransferActio
     if (dialog && !dialog.open) dialog.showModal();
   }, []);
 
+  // After a Dequeue the popup can't be dismissed until the report has reloaded (10s countdown).
+  const refreshAt = result.status === "ok" ? result.refreshAt : undefined;
+  const locked = refreshAt !== undefined;
+  const [secondsLeft, setSecondsLeft] = useState(() => (refreshAt ? Math.max(0, Math.ceil((refreshAt - Date.now()) / 1000)) : 0));
+  useEffect(() => {
+    if (!refreshAt) return;
+    const tick = () => setSecondsLeft(Math.max(0, Math.ceil((refreshAt - Date.now()) / 1000)));
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [refreshAt]);
+
   const title = result.status === "pending" ? "Requesting…" : TRANSFER_ACTION_RESULT_TITLES[result.action][result.status];
 
   return (
@@ -1091,10 +1111,10 @@ function TransferActionResultDialog({ result, onClose }: { result: TransferActio
       ref={dialogRef}
       onCancel={(e) => {
         e.preventDefault();
-        onClose();
+        if (!locked) onClose();
       }}
       onClick={(e) => {
-        if (e.target === dialogRef.current) onClose();
+        if (e.target === dialogRef.current && !locked) onClose();
       }}
       aria-labelledby="transfer-action-result-title"
       className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
@@ -1120,16 +1140,18 @@ function TransferActionResultDialog({ result, onClose }: { result: TransferActio
           )}
           {title}
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-brand-light hover:text-text-primary"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        </button>
+        {!locked && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-brand-light hover:text-text-primary"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
       </div>
       <p className={cn("mt-4 text-sm", result.status === "error" ? "text-red-600" : "text-text-secondary")}>
         {result.status === "pending"
@@ -1141,10 +1163,27 @@ function TransferActionResultDialog({ result, onClose }: { result: TransferActio
       <p className="mt-1.5 text-xs text-text-secondary">
         Id: <span className="font-mono">{result.id}</span>
       </p>
-      {result.status === "ok" && result.action === "dequeue" && (
-        <p className="mt-1.5 text-xs text-text-secondary">The list will refresh in 10 seconds.</p>
+      {locked && (
+        <p className="mt-3 flex items-center gap-2 text-sm font-medium text-brand-primary" aria-live="polite">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0 animate-spin"
+            aria-hidden="true"
+          >
+            <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+            <path d="M18 3v5h-5M6 21v-5h5" />
+          </svg>
+          {secondsLeft > 0 ? `Refreshing the list in ${secondsLeft}s…` : "Refreshing the list…"}
+        </p>
       )}
-      {result.status !== "pending" && (
+      {result.status !== "pending" && !locked && (
         <button
           type="button"
           onClick={onClose}
