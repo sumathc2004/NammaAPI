@@ -573,12 +573,13 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   // Transfer only: removes a queued transfer from the vendor's processing queue. No single-row
   // data comes back (just a status/message), so this doesn't touch the table — only confirms it worked.
   const [dequeuingTxnId, setDequeuingTxnId] = useState<string | null>(null);
-  const [dequeueResult, setDequeueResult] = useState<{ ok: true; message: string } | { ok: false; error: string } | null>(
-    null,
-  );
+  const [dequeueResult, setDequeueResult] = useState<
+    { status: "pending" } | { status: "ok"; message: string } | { status: "error"; error: string } | null
+  >(null);
   async function dequeueRow(uniqueTxnId: string, id: string) {
     if (dequeuingTxnId) return;
     setDequeuingTxnId(uniqueTxnId);
+    setDequeueResult({ status: "pending" });
     try {
       const response = await fetch("/api/dashboard/transfer/dequeue", {
         method: "POST",
@@ -587,12 +588,12 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       });
       const data = await response.json().catch(() => null);
       if (response.ok && data?.ok) {
-        setDequeueResult({ ok: true, message: data.message || "Dequeue updated." });
+        setDequeueResult({ status: "ok", message: data.message || "Dequeue updated." });
       } else {
-        setDequeueResult({ ok: false, error: data?.error || "The transaction could not be dequeued." });
+        setDequeueResult({ status: "error", error: data?.error || "The transaction could not be dequeued." });
       }
     } catch {
-      setDequeueResult({ ok: false, error: "The transaction could not be dequeued." });
+      setDequeueResult({ status: "error", error: "The transaction could not be dequeued." });
     } finally {
       setDequeuingTxnId(null);
     }
@@ -969,20 +970,18 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   );
 }
 
-/** Shown after a Dequeue action: the vendor's own confirmation or error message (no row data comes back). */
-function DequeueResultDialog({
-  result,
-  onClose,
-}: {
-  result: { ok: true; message: string } | { ok: false; error: string };
-  onClose: () => void;
-}) {
+type DequeueResult = { status: "pending" } | { status: "ok"; message: string } | { status: "error"; error: string };
+
+/** Shows "Requesting…" the instant Dequeue is clicked, then the vendor's own confirmation or error (no row data comes back). */
+function DequeueResultDialog({ result, onClose }: { result: DequeueResult; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (dialog && !dialog.open) dialog.showModal();
   }, []);
+
+  const title = result.status === "pending" ? "Requesting…" : result.status === "ok" ? "Removed From Queue" : "Dequeue Failed";
 
   return (
     <dialog
@@ -998,8 +997,25 @@ function DequeueResultDialog({
       className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
     >
       <div className="flex items-start justify-between gap-3">
-        <h2 id="dequeue-result-title" className="text-base font-semibold text-text-primary">
-          {result.ok ? "Removed From Queue" : "Dequeue Failed"}
+        <h2 id="dequeue-result-title" className="flex items-center gap-2 text-base font-semibold text-text-primary">
+          {result.status === "pending" && (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0 animate-spin text-brand-primary"
+              aria-hidden="true"
+            >
+              <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+              <path d="M18 3v5h-5M6 21v-5h5" />
+            </svg>
+          )}
+          {title}
         </h2>
         <button
           type="button"
@@ -1012,16 +1028,22 @@ function DequeueResultDialog({
           </svg>
         </button>
       </div>
-      <p className={cn("mt-4 text-sm", result.ok ? "text-text-secondary" : "text-red-600")}>
-        {result.ok ? result.message : result.error}
+      <p className={cn("mt-4 text-sm", result.status === "error" ? "text-red-600" : "text-text-secondary")}>
+        {result.status === "pending"
+          ? "Sending the request to the payments service…"
+          : result.status === "ok"
+            ? result.message
+            : result.error}
       </p>
-      <button
-        type="button"
-        onClick={onClose}
-        className="mt-5 w-full rounded-lg bg-brand-gradient py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
-      >
-        Close
-      </button>
+      {result.status !== "pending" && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-5 w-full rounded-lg bg-brand-gradient py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+        >
+          Close
+        </button>
+      )}
     </dialog>
   );
 }
