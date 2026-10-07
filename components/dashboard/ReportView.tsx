@@ -32,6 +32,9 @@ import { cn } from "@/lib/cn";
 
 const PAGE_SIZE = 50;
 
+/** Per-row Refresh button in the UTR column (Transfer). Switched off for now; flip to true to bring it back. */
+const ROW_REFRESH_ENABLED = false;
+
 type Range = { from: string; to: string };
 type LoadState =
   | { status: "loading" }
@@ -268,7 +271,7 @@ function RowCard({
   onAction: (action: TransferAction, uniqueTxnId: string, id: string) => void;
 }) {
   const { title, date, amount, badges, details, codes } = layout;
-  const refreshable = section === "transfer" && isRefreshableTransfer(row);
+  const refreshable = ROW_REFRESH_ENABLED && section === "transfer" && isRefreshableTransfer(row);
   const presentCodes = codes.filter((c) => row[c.key] || (refreshable && c.label === "UTR"));
   const refundId = section === "transfer" && isRefundableTransfer(row) ? transferRowId(row) : undefined;
   // Refundable takes over Dequeue when both apply — Enqueue/Refund are the relevant actions then.
@@ -1018,7 +1021,7 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                           column.hideBelow && HIDE_BELOW[column.hideBelow],
                         )}
                       >
-                        {section === "transfer" && column.label === "UTR" && isRefreshableTransfer(row) ? (
+                        {ROW_REFRESH_ENABLED && section === "transfer" && column.label === "UTR" && isRefreshableTransfer(row) ? (
                           <RefreshUtrButton
                             refreshing={refreshingTxnId === row.UniqueTxnId}
                             onRefresh={() => refreshRow(row.UniqueTxnId)}
@@ -1160,9 +1163,11 @@ function TransferActionResultDialog({ result, onClose }: { result: TransferActio
             ? result.message
             : result.error}
       </p>
-      <p className="mt-1.5 text-xs text-text-secondary">
-        Id: <span className="font-mono">{result.id}</span>
-      </p>
+      {result.action === "refund" && (
+        <p className="mt-1.5 text-xs text-text-secondary">
+          Id: <span className="font-mono">{result.id}</span>
+        </p>
+      )}
       {locked && (
         <p className="mt-3 flex items-center gap-2 text-sm font-medium text-brand-primary" aria-live="polite">
           <svg
