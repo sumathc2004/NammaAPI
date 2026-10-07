@@ -242,9 +242,22 @@ function planCard(columns: ColumnInfo[], table: ReportTable | null): CardLayout 
 const footerLabel = (label: string) => (/^reference$/i.test(label) ? "Ref" : label);
 
 /** One report row as a card, for small screens. */
-function RowCard({ row, layout }: { row: ReportRow; layout: CardLayout }) {
+function RowCard({
+  row,
+  layout,
+  section,
+  refreshingTxnId,
+  onRefresh,
+}: {
+  row: ReportRow;
+  layout: CardLayout;
+  section: DashboardSectionId;
+  refreshingTxnId: string | null;
+  onRefresh: (uniqueTxnId: string) => void;
+}) {
   const { title, date, amount, badges, details, codes } = layout;
-  const presentCodes = codes.filter((c) => row[c.key]);
+  const refreshable = section === "transfer" && isRefreshableTransfer(row);
+  const presentCodes = codes.filter((c) => row[c.key] || (refreshable && c.label === "UTR"));
 
   return (
     <li className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-sm">
@@ -299,14 +312,21 @@ function RowCard({ row, layout }: { row: ReportRow; layout: CardLayout }) {
 
       {presentCodes.length > 0 && (
         <div className="space-y-0.5 border-t border-brand-border/70 bg-brand-light/40 px-3.5 py-2">
-          {presentCodes.map((column) => (
-            <p key={column.key} className="flex items-baseline gap-2 text-[11px] text-text-secondary">
-              <span className="shrink-0 font-semibold uppercase tracking-wide">{footerLabel(column.label)}</span>
-              <span className="min-w-0 truncate font-mono" title={row[column.key]}>
-                {row[column.key]}
-              </span>
-            </p>
-          ))}
+          {presentCodes.map((column) =>
+            refreshable && column.label === "UTR" ? (
+              <div key={column.key} className="flex items-baseline justify-between gap-2 py-0.5">
+                <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide">{footerLabel(column.label)}</span>
+                <RefreshUtrButton refreshing={refreshingTxnId === row.UniqueTxnId} onRefresh={() => onRefresh(row.UniqueTxnId)} />
+              </div>
+            ) : (
+              <p key={column.key} className="flex items-baseline gap-2 text-[11px] text-text-secondary">
+                <span className="shrink-0 font-semibold uppercase tracking-wide">{footerLabel(column.label)}</span>
+                <span className="min-w-0 truncate font-mono" title={row[column.key]}>
+                  {row[column.key]}
+                </span>
+              </p>
+            ),
+          )}
         </div>
       )}
     </li>
@@ -397,6 +417,39 @@ function Pager({
   );
 }
 
+/** Transfer only: Success with no UTR yet is the one state worth a manual re-check. */
+const isRefreshableTransfer = (row: ReportRow) => row.TxnStatus === "Success" && !row.UTR;
+
+function RefreshUtrButton({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onRefresh}
+      disabled={refreshing}
+      aria-label="Refresh UTR status"
+      title="Refresh UTR status"
+      className="inline-flex items-center gap-1.5 rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50"
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn("shrink-0", refreshing && "animate-spin")}
+        aria-hidden="true"
+      >
+        <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+        <path d="M18 3v5h-5M6 21v-5h5" />
+      </svg>
+      Refresh
+    </button>
+  );
+}
+
 /** Date-range report screen used by dashboard sections backed by a vendor report endpoint. */
 export function ReportView({ section }: { section: DashboardSectionId }) {
   const router = useRouter();
@@ -436,6 +489,30 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     apply(draft);
+  }
+
+  // Transfer only: a row showing Success with no UTR yet can be re-checked on its own, without
+  // reloading the whole table. There's no single-transaction vendor endpoint, so this re-runs the
+  // report for the same range and patches in just that one row.
+  const [refreshingTxnId, setRefreshingTxnId] = useState<string | null>(null);
+  async function refreshRow(uniqueTxnId: string) {
+    if (refreshingTxnId) return;
+    setRefreshingTxnId(uniqueTxnId);
+    try {
+      const next = await loadReport(section, range);
+      if (next.status === "ready") {
+        const updated = next.table.rows.find((r) => r.UniqueTxnId === uniqueTxnId);
+        if (updated) {
+          setState((prev) =>
+            prev.status === "ready"
+              ? { ...prev, table: { ...prev.table, rows: prev.table.rows.map((r) => (r.UniqueTxnId === uniqueTxnId ? updated : r)) } }
+              : prev,
+          );
+        }
+      }
+    } finally {
+      setRefreshingTxnId(null);
+    }
   }
 
   const table = state.status === "ready" ? state.table : null;
@@ -714,7 +791,14 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
         {table && filteredRows.length > 0 && (
           <ul className="space-y-2.5 pt-3 md:hidden" aria-label={`${label} entries`}>
             {pageRows.map((row, i) => (
-              <RowCard key={currentPage * PAGE_SIZE + i} row={row} layout={cardLayout} />
+              <RowCard
+                key={currentPage * PAGE_SIZE + i}
+                row={row}
+                layout={cardLayout}
+                section={section}
+                refreshingTxnId={refreshingTxnId}
+                onRefresh={refreshRow}
+              />
             ))}
           </ul>
         )}
@@ -765,7 +849,14 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                           column.hideBelow && HIDE_BELOW[column.hideBelow],
                         )}
                       >
-                        <Cell column={column} row={row} variant="table" />
+                        {section === "transfer" && column.label === "UTR" && isRefreshableTransfer(row) ? (
+                          <RefreshUtrButton
+                            refreshing={refreshingTxnId === row.UniqueTxnId}
+                            onRefresh={() => refreshRow(row.UniqueTxnId)}
+                          />
+                        ) : (
+                          <Cell column={column} row={row} variant="table" />
+                        )}
                       </td>
                     ))}
                   </tr>
