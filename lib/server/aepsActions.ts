@@ -13,8 +13,10 @@ export async function dequeueTransfer(id: string): Promise<DequeueResult> {
   const result = await aepsRequest("Txn/UpdateDequeue", { id }, { api: "client", method: "POST", prefer: "json" });
   if (!result.ok) return { ok: false, error: result.error };
 
-  const body = result.body as { status?: boolean; message?: string } | null;
+  const body = result.body as { status?: boolean; message?: string; id?: string } | null;
   if (!body || body.status !== true) {
+    // id isn't a secret (unlike the password on other vendor calls) — safe to log for diagnosis.
+    console.error(`AEPS Txn/UpdateDequeue rejected id "${id}":`, JSON.stringify(body));
     return { ok: false, error: body?.message || "The transaction could not be dequeued." };
   }
   return { ok: true, message: body.message || "Dequeue updated." };
