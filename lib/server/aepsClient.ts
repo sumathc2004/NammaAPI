@@ -68,7 +68,9 @@ export async function aepsRequest(
     responseText = (await response.text()).trim();
     contentType = response.headers.get("content-type") ?? "";
     if (!response.ok) {
-      console.error(`AEPS ${endpoint} returned HTTP ${response.status}.`);
+      // The body itself is the vendor's own error reply, not anything we sent — safe to log,
+      // unlike the request URL (which carries the password for credentialed calls).
+      console.error(`AEPS ${endpoint} returned HTTP ${response.status}:`, responseText.slice(0, 500));
       return { ok: false, error: AEPS_UNAVAILABLE_ERROR, status: response.status };
     }
   } catch (err) {
