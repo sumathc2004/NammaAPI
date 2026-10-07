@@ -11,11 +11,12 @@ import { cn } from "@/lib/cn";
 
 const MOBILE_DRAWER_ID = "dashboard-drawer";
 const COLLAPSED_STORAGE_KEY = "namma-sidebar-collapsed";
+const HIDDEN_STORAGE_KEY = "namma-sidebar-hidden";
 
 /** Remembered sidebar preference; storage can be unavailable (private mode), so fall back to expanded. */
-function readCollapsedPreference(): boolean {
+function readBooleanPreference(key: string): boolean {
   try {
-    return typeof window !== "undefined" && localStorage.getItem(COLLAPSED_STORAGE_KEY) === "1";
+    return typeof window !== "undefined" && localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
@@ -36,7 +37,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Read during the first client render; the sidebar isn't rendered until the session is known,
   // so this can't cause a hydration mismatch.
-  const [collapsed, setCollapsed] = useState(readCollapsedPreference);
+  const [collapsed, setCollapsed] = useState(() => readBooleanPreference(COLLAPSED_STORAGE_KEY));
+  const [sidebarHidden, setSidebarHidden] = useState(() => readBooleanPreference(HIDDEN_STORAGE_KEY));
   const [lastPathname, setLastPathname] = useState(pathname);
 
   function toggleCollapsed() {
@@ -44,6 +46,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     setCollapsed(next);
     try {
       localStorage.setItem(COLLAPSED_STORAGE_KEY, next ? "1" : "0");
+    } catch {}
+  }
+
+  function setSidebarHiddenPersisted(next: boolean) {
+    setSidebarHidden(next);
+    try {
+      localStorage.setItem(HIDDEN_STORAGE_KEY, next ? "1" : "0");
     } catch {}
   }
   if (pathname !== lastPathname) {
@@ -89,6 +98,19 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               <path d="M3 6H19M3 11H19M3 16H19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </button>
+          {sidebarHidden && (
+            <button
+              type="button"
+              onClick={() => setSidebarHiddenPersisted(false)}
+              aria-label="Show sidebar"
+              title="Show sidebar"
+              className="hidden h-10 w-10 items-center justify-center rounded-lg text-text-primary hover:bg-brand-light lg:flex"
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+                <path d="M3 6H19M3 11H19M3 16H19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
           <Logo href="/dashboard" priority />
         </div>
         <div className="flex items-center gap-3">
@@ -102,10 +124,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <aside
           className={cn(
             "hidden shrink-0 overflow-hidden transition-[width] duration-300 lg:block",
-            collapsed ? "w-18" : "w-64",
+            sidebarHidden ? "w-0" : collapsed ? "w-18" : "w-64",
           )}
         >
-          <DashboardSidebar collapsed={collapsed} isAdmin={profile.isAdmin} onToggleCollapse={toggleCollapsed} />
+          <DashboardSidebar
+            collapsed={collapsed}
+            isAdmin={profile.isAdmin}
+            onToggleCollapse={toggleCollapsed}
+            onClose={() => setSidebarHiddenPersisted(true)}
+          />
         </aside>
 
         {/* Mobile drawer */}

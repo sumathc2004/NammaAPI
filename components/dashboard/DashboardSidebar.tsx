@@ -16,6 +16,8 @@ type DashboardSidebarProps = {
   onToggleCollapse?: () => void;
   /** Called after a link is followed (closes the mobile drawer). */
   onNavigate?: () => void;
+  /** Shows a close (×) button that fully hides the sidebar (desktop only — the mobile drawer has its own). */
+  onClose?: () => void;
 };
 
 const menuSections = dashboardSections.filter((s) => !isAdminOnly(s));
@@ -83,12 +85,27 @@ function SidebarGroup({ title, sections, collapsed, pathname, onNavigate }: Side
 }
 
 /** Sidebar contents, shared by the desktop sidebar and the mobile drawer. */
-export function DashboardSidebar({ collapsed = false, isAdmin = false, onToggleCollapse, onNavigate }: DashboardSidebarProps) {
+export function DashboardSidebar({ collapsed = false, isAdmin = false, onToggleCollapse, onNavigate, onClose }: DashboardSidebarProps) {
   const pathname = usePathname();
   const groupProps = { collapsed, pathname, onNavigate };
 
   return (
     <div className="flex h-full flex-col border-r border-white/5 bg-linear-to-b from-brand-navy to-brand-ink">
+      {onClose && (
+        <div className="flex shrink-0 items-center justify-end px-3 pt-3">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            title="Close menu"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
       <nav aria-label="Dashboard" className="scrollbar-dark flex-1 overflow-y-auto overflow-x-hidden px-3 py-5">
         <SidebarGroup title="Menu" sections={menuSections} {...groupProps} />
         {isAdmin && adminSections.length > 0 && (
