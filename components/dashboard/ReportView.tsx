@@ -574,12 +574,14 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   }, [table, columns]);
   const showTotals = !!table && table.rows.length > 0 && (totals?.credit != null || totals?.debit != null);
 
-  // A new page, tab or search starts at the first row, not wherever the table was scrolled to.
+  // A new page, tab, search or date range starts at the first row, not wherever the table was
+  // scrolled to. `range` (not `table`) is the dependency: a per-row Refresh also produces a new
+  // `table` object but shouldn't jump the view back to the top of the list.
   const toolbarRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     tableScrollRef.current?.scrollTo({ top: 0 });
-  }, [currentPage, activeView, query, table]);
+  }, [currentPage, activeView, query, range]);
 
   function goToPage(next: number) {
     setPage(next);
@@ -709,6 +711,30 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
               })}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => apply(range)}
+            disabled={state.status === "loading"}
+            aria-label="Refresh report"
+            title="Refresh report"
+            className="order-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-border bg-white text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:pointer-events-none disabled:opacity-50"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={cn(state.status === "loading" && "animate-spin")}
+              aria-hidden="true"
+            >
+              <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+              <path d="M18 3v5h-5M6 21v-5h5" />
+            </svg>
+          </button>
           <div className="relative order-2 min-w-0 flex-1 md:w-56 md:flex-none xl:w-72">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
