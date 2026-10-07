@@ -267,8 +267,9 @@ function RowCard({
   const { title, date, amount, badges, details, codes } = layout;
   const refreshable = section === "transfer" && isRefreshableTransfer(row);
   const presentCodes = codes.filter((c) => row[c.key] || (refreshable && c.label === "UTR"));
-  const queueId = section === "transfer" && isQueuedTransfer(row) ? transferRowId(row) : undefined;
   const refundId = section === "transfer" && isRefundableTransfer(row) ? transferRowId(row) : undefined;
+  // Refundable takes over Dequeue when both apply — Enqueue/Refund are the relevant actions then.
+  const queueId = section === "transfer" && !refundId && isQueuedTransfer(row) ? transferRowId(row) : undefined;
   const isPending = (action: TransferAction) => pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === action;
 
   return (
@@ -983,10 +984,12 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                           />
                         ) : section === "transfer" &&
                           column.kind === "status" &&
-                          ((isQueuedTransfer(row) && transferRowId(row)) || (isRefundableTransfer(row) && transferRowId(row))) ? (
+                          // Refundable takes over Dequeue when both apply — Enqueue/Refund are the relevant actions then.
+                          ((isQueuedTransfer(row) && !isRefundableTransfer(row) && transferRowId(row)) ||
+                            (isRefundableTransfer(row) && transferRowId(row))) ? (
                           <div className="flex flex-col items-start gap-1">
                             <Cell column={column} row={row} variant="table" />
-                            {isQueuedTransfer(row) && transferRowId(row) && (
+                            {isQueuedTransfer(row) && !isRefundableTransfer(row) && transferRowId(row) && (
                               <TransferActionButton
                                 action="dequeue"
                                 pending={pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === "dequeue"}
