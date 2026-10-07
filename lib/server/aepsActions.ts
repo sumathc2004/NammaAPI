@@ -4,11 +4,13 @@ import { aepsRequest } from "@/lib/server/aepsClient";
 export type DequeueResult = { ok: true; message: string } | { ok: false; error: string };
 
 /**
- * GET {CLIENT_API_BASE_URL}/Txn/UpdateDequeue?id=<id> — removes a transfer from the vendor's
- * processing queue. Confirmed response shape: { status: boolean, message: string, id: string }.
+ * POST {CLIENT_API_BASE_URL}/Txn/UpdateDequeue?id=<id> — removes a transfer from the vendor's
+ * processing queue (GET returns HTTP 405; the vendor's action endpoints take the parameter in the
+ * query string even on POST, same as the login endpoint). Confirmed response shape:
+ * { status: boolean, message: string, id: string }.
  */
 export async function dequeueTransfer(id: string): Promise<DequeueResult> {
-  const result = await aepsRequest("Txn/UpdateDequeue", { id }, { api: "client", prefer: "json" });
+  const result = await aepsRequest("Txn/UpdateDequeue", { id }, { api: "client", method: "POST", prefer: "json" });
   if (!result.ok) return { ok: false, error: result.error };
 
   const body = result.body as { status?: boolean; message?: string } | null;
