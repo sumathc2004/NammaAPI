@@ -14,10 +14,12 @@ import {
   dateCellText,
   describeColumns,
   formatAmount,
+  isQueuedTransfer,
   isRefreshableTransfer,
   layoutColumns,
   sumColumn,
   toCsv,
+  transferRowId,
   type ColumnInfo,
   type ReportRow,
   type ReportTable,
@@ -249,16 +251,21 @@ function RowCard({
   section,
   refreshingTxnId,
   onRefresh,
+  dequeuingTxnId,
+  onDequeue,
 }: {
   row: ReportRow;
   layout: CardLayout;
   section: DashboardSectionId;
   refreshingTxnId: string | null;
   onRefresh: (uniqueTxnId: string) => void;
+  dequeuingTxnId: string | null;
+  onDequeue: (uniqueTxnId: string, id: string) => void;
 }) {
   const { title, date, amount, badges, details, codes } = layout;
   const refreshable = section === "transfer" && isRefreshableTransfer(row);
   const presentCodes = codes.filter((c) => row[c.key] || (refreshable && c.label === "UTR"));
+  const queueId = section === "transfer" && isQueuedTransfer(row) ? transferRowId(row) : undefined;
 
   return (
     <li className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-sm">
@@ -288,6 +295,12 @@ function RowCard({
                   <Cell key={column.key} column={column} row={row} />
                 ))}
               </span>
+            )}
+            {queueId && (
+              <DequeueButton
+                dequeuing={dequeuingTxnId === row.UniqueTxnId}
+                onDequeue={() => onDequeue(row.UniqueTxnId, queueId)}
+              />
             )}
           </div>
         )}
@@ -448,6 +461,43 @@ function RefreshUtrButton({ refreshing, onRefresh }: { refreshing: boolean; onRe
   );
 }
 
+function DequeueButton({ dequeuing, onDequeue }: { dequeuing: boolean; onDequeue: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onDequeue}
+      disabled={dequeuing}
+      aria-label="Remove from queue"
+      title="Remove from queue"
+      className="inline-flex items-center gap-1.5 rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50"
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn("shrink-0", dequeuing && "animate-spin")}
+        aria-hidden="true"
+      >
+        {dequeuing ? (
+          <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5M18 3v5h-5M6 21v-5h5" />
+        ) : (
+          <>
+            <path d="M5 12h11" />
+            <path d="M12 7l5 5-5 5" />
+            <path d="M19 5v14" />
+          </>
+        )}
+      </svg>
+      Dequeue
+    </button>
+  );
+}
+
 /** Date-range report screen used by dashboard sections backed by a vendor report endpoint. */
 export function ReportView({ section }: { section: DashboardSectionId }) {
   const router = useRouter();
@@ -520,6 +570,33 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
     }
   }
 
+  // Transfer only: removes a queued transfer from the vendor's processing queue. No single-row
+  // data comes back (just a status/message), so this doesn't touch the table — only confirms it worked.
+  const [dequeuingTxnId, setDequeuingTxnId] = useState<string | null>(null);
+  const [dequeueResult, setDequeueResult] = useState<{ ok: true; message: string } | { ok: false; error: string } | null>(
+    null,
+  );
+  async function dequeueRow(uniqueTxnId: string, id: string) {
+    if (dequeuingTxnId) return;
+    setDequeuingTxnId(uniqueTxnId);
+    try {
+      const response = await fetch("/api/dashboard/transfer/dequeue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.ok) {
+        setDequeueResult({ ok: true, message: data.message || "Dequeue updated." });
+      } else {
+        setDequeueResult({ ok: false, error: data?.error || "The transaction could not be dequeued." });
+      }
+    } catch {
+      setDequeueResult({ ok: false, error: "The transaction could not be dequeued." });
+    } finally {
+      setDequeuingTxnId(null);
+    }
+  }
 
   const table = state.status === "ready" ? state.table : null;
   const layout = reportLayouts[section];
@@ -806,6 +883,8 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                 section={section}
                 refreshingTxnId={refreshingTxnId}
                 onRefresh={refreshRow}
+                dequeuingTxnId={dequeuingTxnId}
+                onDequeue={dequeueRow}
               />
             ))}
           </ul>
@@ -862,6 +941,14 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
                             refreshing={refreshingTxnId === row.UniqueTxnId}
                             onRefresh={() => refreshRow(row.UniqueTxnId)}
                           />
+                        ) : section === "transfer" && column.kind === "status" && isQueuedTransfer(row) && transferRowId(row) ? (
+                          <div className="flex flex-col items-start gap-1">
+                            <Cell column={column} row={row} variant="table" />
+                            <DequeueButton
+                              dequeuing={dequeuingTxnId === row.UniqueTxnId}
+                              onDequeue={() => dequeueRow(row.UniqueTxnId, transferRowId(row)!)}
+                            />
+                          </div>
                         ) : (
                           <Cell column={column} row={row} variant="table" />
                         )}
@@ -877,7 +964,65 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       </div>
 
       {refreshResult && <RefreshResultDialog result={refreshResult} onClose={() => setRefreshResult(null)} />}
+      {dequeueResult && <DequeueResultDialog result={dequeueResult} onClose={() => setDequeueResult(null)} />}
     </div>
+  );
+}
+
+/** Shown after a Dequeue action: the vendor's own confirmation or error message (no row data comes back). */
+function DequeueResultDialog({
+  result,
+  onClose,
+}: {
+  result: { ok: true; message: string } | { ok: false; error: string };
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === dialogRef.current) onClose();
+      }}
+      aria-labelledby="dequeue-result-title"
+      className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="dequeue-result-title" className="text-base font-semibold text-text-primary">
+          {result.ok ? "Removed From Queue" : "Dequeue Failed"}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-brand-light hover:text-text-primary"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      <p className={cn("mt-4 text-sm", result.ok ? "text-text-secondary" : "text-red-600")}>
+        {result.ok ? result.message : result.error}
+      </p>
+      <button
+        type="button"
+        onClick={onClose}
+        className="mt-5 w-full rounded-lg bg-brand-gradient py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+      >
+        Close
+      </button>
+    </dialog>
   );
 }
 

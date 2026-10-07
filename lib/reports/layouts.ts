@@ -1,5 +1,5 @@
 import type { DashboardSectionId } from "@/lib/data/dashboardNav";
-import { isRefreshableTransfer, type ColumnSlot, type ReportRow } from "@/lib/reports/table";
+import { isQueuedTransfer, isRefreshableTransfer, isRefundableTransfer, type ColumnSlot, type ReportRow } from "@/lib/reports/table";
 
 // Fixed column layouts for report sections, in display order. Each slot lists the vendor field
 // names it accepts (lowercased, separators removed), most specific first. Sections without a
@@ -127,47 +127,22 @@ export const reportLayouts: Partial<Record<DashboardSectionId, ColumnSlot[]>> = 
 /** A tab above a report that shows only the rows it matches (no `match` = every row). */
 export type ReportViewTab = { id: string; label: string; emptyText?: string; match?: (row: ReportRow) => boolean };
 
-const isYes = (value = "") => /^(yes|y|true|1)$/i.test(value.trim());
-
-/** Transfer statuses that mean "not processed yet". */
-const QUEUED_STATUS = /^(queued?|in ?queue|pending|initiated|processing|in ?process|on ?hold|hold)$/i;
-
-const normalizeFieldName = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-/**
- * Reads a boolean-ish flag off a row by matching the field name itself (case/separators ignored),
- * not a fixed key — the vendor has sent this under more than one spelling (e.g. CanRefund vs
- * canbeRefund, dequeue vs AddToqueue vs dequeueEnable), and silently missing the field means the
- * tab always shows empty instead of erroring.
- */
-function rowFlag(row: ReportRow, names: string[]): boolean {
-  return Object.keys(row).some((key) => names.includes(normalizeFieldName(key)) && isYes(row[key]));
-}
-
-// Transfer tabs. Queue: TxnStatus "in queue" (seen live; shown as "In Queue"), or a dequeue/queue
-// flag — the vendor has sent this as dequeue, AddToqueue and dequeueEnable across different
-// responses. Refundable: a can-refund flag (CanRefund, confirmed; also seen as canbeRefund).
+// Transfer tabs. See lib/reports/table.ts for what each flag matches (the vendor sends more than
+// one spelling for Queue and Refundable; Refresh also honors the vendor's own canRefresh flag).
 const transferViews: ReportViewTab[] = [
   { id: "all", label: "All" },
-  {
-    id: "queue",
-    label: "Queue",
-    emptyText: "No transfers in the queue for this period.",
-    match: (row) => rowFlag(row, ["dequeue", "addtoqueue", "dequeueenable"]) || QUEUED_STATUS.test(row.TxnStatus ?? ""),
-  },
+  { id: "queue", label: "Queue", emptyText: "No transfers in the queue for this period.", match: isQueuedTransfer },
   {
     id: "refundable",
     label: "Refundable",
     emptyText: "No refundable transfers for this period.",
-    match: (row) => rowFlag(row, ["canrefund", "canberefund"]),
+    match: isRefundableTransfer,
   },
   {
     id: "needs-refresh",
     label: "Refresh",
     emptyText: "No transfers waiting on a UTR for this period.",
-    // The vendor's own canRefresh flag, when sent, is authoritative; otherwise fall back to our
-    // own check (Success status with no valid UTR yet).
-    match: (row) => rowFlag(row, ["canrefresh"]) || isRefreshableTransfer(row),
+    match: isRefreshableTransfer,
   },
 ];
 

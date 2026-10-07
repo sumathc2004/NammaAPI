@@ -32,7 +32,27 @@ export type TextFormat = "code" | "words";
 /** Header text: "Account / IFSC" for a column with a second field. */
 export const columnTitle = (column: ColumnInfo) => (column.subLabel ? `${column.label} / ${column.subLabel}` : column.label);
 
-// Transfer only: Success with no (or no valid) UTR yet is the one state worth a manual re-check.
+// Transfer-row flags: the vendor has sent the same concept under more than one field spelling
+// (CanRefund vs canbeRefund, dequeue vs AddToqueue vs dequeueEnable), so these match by the
+// field's normalized name rather than a fixed key — missing a spelling silently shows a tab as
+// always-empty instead of erroring.
+const isYes = (value = "") => /^(yes|y|true|1)$/i.test(value.trim());
+const normalizeFieldName = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function rowFlag(row: ReportRow, names: string[]): boolean {
+  return Object.keys(row).some((key) => names.includes(normalizeFieldName(key)) && isYes(row[key]));
+}
+
+/** Transfer statuses that mean "not processed yet". */
+const QUEUED_STATUS = /^(queued?|in ?queue|pending|initiated|processing|in ?process|on ?hold|hold)$/i;
+
+/** Transfer only: queued for processing — seen live as TxnStatus "In Queue", or a dequeue/queue flag. */
+export const isQueuedTransfer = (row: ReportRow) =>
+  rowFlag(row, ["dequeue", "addtoqueue", "dequeueenable"]) || QUEUED_STATUS.test(row.TxnStatus ?? "");
+
+/** Transfer only: eligible for a refund (CanRefund "yes", confirmed; also seen as canbeRefund). */
+export const isRefundableTransfer = (row: ReportRow) => rowFlag(row, ["canrefund", "canberefund"]);
+
 // Placeholder values the vendor sends instead of a real bank UTR — not just a blank field.
 const IMPROPER_UTR = /^(-|0+|n\/?a|null|nil|pending|tbd|na)$/i;
 
@@ -43,7 +63,19 @@ export function isProperUtr(utr: string | undefined): boolean {
   return /^\d{12}$/.test(value);
 }
 
-export const isRefreshableTransfer = (row: ReportRow) => row.TxnStatus === "Success" && !isProperUtr(row.UTR);
+/**
+ * Transfer only: worth a manual re-check — the vendor's own canRefresh flag when it sends one,
+ * otherwise Success with no (or no valid) UTR yet.
+ */
+export const isRefreshableTransfer = (row: ReportRow) =>
+  rowFlag(row, ["canrefresh"]) || (row.TxnStatus === "Success" && !isProperUtr(row.UTR));
+
+/** Transfer only: the vendor's internal id for this row (field name varies), used by row actions like dequeue. */
+export function transferRowId(row: ReportRow): string | undefined {
+  const key = Object.keys(row).find((k) => normalizeFieldName(k) === "id");
+  const value = key ? row[key]?.trim() : undefined;
+  return value || undefined;
+}
 
 const isZero = (value: string) => !value || Number(value.replace(/,/g, "")) === 0;
 
