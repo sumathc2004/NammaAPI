@@ -2,6 +2,7 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { getAuthSecret } from "@/lib/server/env";
+import { SESSION_TTL_SECONDS } from "@/lib/auth/demoSession";
 
 /**
  * Server-side login session. The vendor API needs the account's username and password on every
@@ -12,7 +13,6 @@ import { getAuthSecret } from "@/lib/server/env";
  */
 
 const COOKIE_NAME = "namma_session";
-const SESSION_TTL_SECONDS = 8 * 60 * 60;
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
 

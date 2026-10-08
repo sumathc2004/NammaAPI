@@ -81,7 +81,7 @@ lib/
   admin/apiBalance.ts     Client-safe type for the admin API level balance
   reports/                Client-safe report helpers: date ranges (dates.ts), table formatting (table.ts),
                           fixed column layouts per section (layouts.ts)
-  auth/demoSession.ts     Profile (balances) for the dashboard UI, in sessionStorage — no credentials
+  auth/demoSession.ts     Profile (balances) for the dashboard UI, in localStorage (valid 24h) — no credentials
   metadata.ts             buildMetadata(), SITE_NAME, SITE_URL
   rate-limit.ts           In-memory fixed-window rate limiter for API routes
   cn.ts                   className joiner (tailwind-merge)
@@ -134,14 +134,14 @@ The login is a deliberate prototype for client demos:
 1. `LoginForm` posts the phone number and password to `/api/auth/login`.
 2. The route normalizes the phone number to 10 digits and calls the vendor endpoint `POST {AEPS_API_BASE_URL}/GetV2LoginInfo_api?UserName=<phone>&Password=<password>` — a POST, but the parameters must be in the query string (a JSON body returns 404 "No action was found"). See `lib/server/aepsAuth.ts`; all vendor calls go through `aepsRequest()` in `lib/server/aepsClient.ts`.
 3. With `Accept: application/json` the vendor returns a flat JSON object: `MESSAGE` (`"Success"` on valid credentials), `UserName`, `Otp`, `defaultOTP`, `Balance`, `walletBalance` (debit wallet), `CreditBalance` (credit wallet), `aepsBalance`, `bbpsBalance`, `cmsBalance`, `isAdmin`, and empty AEPS identity fields. All values are strings; codes can have leading zeros (e.g. `defaultOTP: "0022"`), so they are never converted to numbers. (The XML form wraps the same fields in `AEPSController.NPLoginResponse`; both are handled.)
-4. On success the route stores `{ userName, password, isAdmin }` in the `namma_session` cookie (`lib/server/session.ts`): AES-256-GCM encrypted with `AUTH_SECRET`, httpOnly, 8-hour expiry. Later vendor calls read credentials from it. The password is never sent back to the browser or stored client-side.
+4. On success the route stores `{ userName, password, isAdmin }` in the `namma_session` cookie (`lib/server/session.ts`): AES-256-GCM encrypted with `AUTH_SECRET`, httpOnly, 24-hour expiry (`SESSION_TTL_SECONDS` in `lib/auth/demoSession.ts`, shared with the stored profile) so a login lasts a full day, even across closing the browser. Later vendor calls read credentials from it. The password is never sent back to the browser or stored client-side.
 5. The route returns `defaultOTP` and the balances to the browser. `OtpDialog` shows one box per digit and accepts the code only if it equals `defaultOTP`.
-6. On a match the profile (balances only) is stored in `sessionStorage` (`lib/auth/demoSession.ts`) and the user lands on the first dashboard section. `DashboardShell` redirects to `/login` when there's no profile. Log out calls `/api/auth/logout` and clears both.
+6. On a match the profile (balances only) is stored in `localStorage` with a 24h expiry (`lib/auth/demoSession.ts`) and the user lands on the first dashboard section. `DashboardShell` redirects to `/login` when there's no profile. Log out calls `/api/auth/logout` and clears both.
 
 Known gaps — fix all of them before real users log in:
 - The expected OTP is sent to the browser, so anyone can read it in devtools; and it is the account's fixed `defaultOTP`, not the per-request `Otp`.
 - The session cookie is set as soon as the vendor accepts the password, before the OTP step, and the OTP is checked only in the browser. Verify the OTP on the server and set the cookie only after it matches.
-- The dashboard's "logged in" check reads `sessionStorage`; the real authority is the session cookie (report routes return 401 without it).
+- The dashboard's "logged in" check reads `localStorage` (expires after 24h, like the cookie); `/login` redirects straight to the dashboard while it is valid; the real authority is the session cookie (report routes return 401 without it).
 - The vendor API takes the password as a query parameter (even on the POST login endpoint), so it appears in this server's outbound URLs. Never log those URLs; ask the vendor to accept credentials in the request body.
 - Login accepts either code the vendor returns: `Otp` (the per-request code sent to the customer by SMS) or `defaultOTP` (the fixed fallback) — `acceptedOtps` in the login response; the default one is what gets pre-filled when `PREFILL_DEFAULT_OTP` is on. `PREFILL_DEFAULT_OTP` (off) in `app/(auth)/login/LoginForm.tsx` pre-fills the OTP boxes with the expected code, so login is Verify-only — turn it off before real users log in.
 - `SHOW_DEMO_OTP` in `app/(auth)/login/LoginForm.tsx` prints the expected OTP inside the modal when set to `true`.

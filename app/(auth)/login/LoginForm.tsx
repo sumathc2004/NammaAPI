@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormInput } from "@/components/ui/FormInput";
 import { Button } from "@/components/ui/Button";
 import { isValidIndianMobile } from "@/lib/validation/fields";
-import { saveDemoSession, type AepsProfile } from "@/lib/auth/demoSession";
+import { parseDemoSession, readDemoSessionRaw, saveDemoSession, type AepsProfile } from "@/lib/auth/demoSession";
 import { DEFAULT_DASHBOARD_PATH } from "@/lib/data/dashboardNav";
 import { OtpDialog } from "./OtpDialog";
 
@@ -28,6 +28,11 @@ export function LoginForm() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState<PendingLogin | null>(null);
+
+  // Already logged in today: go straight to the dashboard instead of asking again.
+  useEffect(() => {
+    if (parseDemoSession(readDemoSessionRaw())) router.replace(DEFAULT_DASHBOARD_PATH);
+  }, [router]);
 
   /** Calls the login API (which does the GET). Returns an error message, or null on success. */
   async function requestOtp(): Promise<string | null> {
