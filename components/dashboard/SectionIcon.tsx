@@ -31,6 +31,12 @@ const paths = {
       <path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM14 20h1.5M20 14v1.5" />
     </>
   ),
+  "bill-payments": (
+    <>
+      <path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4v-17Z" />
+      <path d="M9 8h6M9 11.5h6M9 15h3" />
+    </>
+  ),
   "wallet-ledger": (
     <>
       <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H17v3" />

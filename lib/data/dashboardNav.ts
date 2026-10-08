@@ -23,6 +23,11 @@ export const dashboardSections = [
     description: "Payments received through your QR codes.",
   },
   {
+    id: "bill-payments",
+    label: "Bill Payments",
+    description: "Electricity, mobile, DTH and other bill payments made from your account.",
+  },
+  {
     id: "wallet-ledger",
     label: "Wallet Ledger",
     description: "Every credit and debit on your wallet balance.",
