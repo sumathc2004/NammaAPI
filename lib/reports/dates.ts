@@ -1,6 +1,8 @@
 // Date helpers for report date ranges. Dates travel as ISO "yyyy-MM-dd" strings (the value of
 // <input type="date">); lib/server/aepsReports.ts converts them to the vendor's format.
 
+import type { DashboardSectionId } from "@/lib/data/dashboardNav";
+
 export const MAX_RANGE_DAYS = 366;
 
 /**
@@ -9,6 +11,16 @@ export const MAX_RANGE_DAYS = 366;
  * only mirror it. Changing it needs a code change and a deploy — no request can override it.
  */
 export const REPORTS_START_DATE = "2026-10-07";
+
+/** Sections whose reports start earlier (or later) than REPORTS_START_DATE. */
+const SECTION_START_DATES: Partial<Record<DashboardSectionId, string>> = {
+  "pg-reports": "2026-10-04",
+};
+
+/** The earliest day a section's report can show: its own start date, else REPORTS_START_DATE. */
+export function reportStartDate(section?: DashboardSectionId): string {
+  return (section && SECTION_START_DATES[section]) || REPORTS_START_DATE;
+}
 
 /** Local calendar date as "yyyy-MM-dd". */
 export function toIsoDate(date: Date): string {
@@ -36,9 +48,10 @@ export function formatIsoDate(value: string): string {
 }
 
 /** Returns an error message, or null when `from`–`to` is a valid range. */
-export function validateRange(from: string, to: string): string | null {
+export function validateRange(from: string, to: string, section?: DashboardSectionId): string | null {
   if (!isIsoDate(from) || !isIsoDate(to)) return "Choose a valid From and To date.";
-  if (from < REPORTS_START_DATE) return `Reports are available from ${formatIsoDate(REPORTS_START_DATE)}.`;
+  const start = reportStartDate(section);
+  if (from < start) return `Reports are available from ${formatIsoDate(start)}.`;
   if (from > to) return "From date must be on or before To date.";
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
   if (days > MAX_RANGE_DAYS) return `Choose a range of ${MAX_RANGE_DAYS} days or less.`;

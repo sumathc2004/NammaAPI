@@ -1,7 +1,7 @@
 import "server-only";
 import { aepsRequest } from "@/lib/server/aepsClient";
 import type { DashboardSectionId } from "@/lib/data/dashboardNav";
-import { REPORTS_START_DATE, toIsoDate } from "@/lib/reports/dates";
+import { reportStartDate, toIsoDate } from "@/lib/reports/dates";
 import { hasStaleQueuedStatus, parseDate, type ReportRow, type ReportTable } from "@/lib/reports/table";
 import type { SessionCredentials } from "@/lib/server/session";
 
@@ -216,14 +216,15 @@ export async function fetchReport(
 
   const raw = toTable(records);
   const transformed = config.transform ? raw.rows.map(config.transform) : raw.rows;
-  // Never pass on anything dated before REPORTS_START_DATE, whatever range the vendor returned.
+  // Never pass on anything dated before the section's start date, whatever range the vendor returned.
+  const startDate = reportStartDate(section);
   // Rows without a readable date are dropped too: when in doubt, don't show it.
   const rows = transformed.filter((row) => {
     const date = rowDate(row);
-    return date !== null && date >= REPORTS_START_DATE;
+    return date !== null && date >= startDate;
   });
   if (process.env.NODE_ENV === "development" && rows.length < transformed.length) {
-    console.info(`AEPS ${endpoint}: hid ${transformed.length - rows.length} rows dated before ${REPORTS_START_DATE} or undated.`);
+    console.info(`AEPS ${endpoint}: hid ${transformed.length - rows.length} rows dated before ${startDate} or undated.`);
   }
   // A transform can add fields (e.g. PG's combined "card"); include them as columns too.
   const columns = [...raw.columns];

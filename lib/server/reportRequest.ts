@@ -26,7 +26,7 @@ export async function handleReportRequest(request: Request, section: DashboardSe
   const fromDate = params.get("fromDate") || today;
   const toDate = params.get("toDate") || today;
 
-  const rangeError = validateRange(fromDate, toDate);
+  const rangeError = validateRange(fromDate, toDate, section);
   if (rangeError) return NextResponse.json({ error: rangeError }, { status: 400 });
 
   const credentials = await getSessionCredentials();

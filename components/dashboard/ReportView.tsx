@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { getDashboardSection, type DashboardSectionId } from "@/lib/data/dashboardNav";
 import { clearDemoSession } from "@/lib/auth/demoSession";
-import { REPORTS_START_DATE, toIsoDate, validateRange } from "@/lib/reports/dates";
+import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import {
   amountTone,
@@ -570,7 +570,7 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
   }, [section, range]);
 
   function apply(next: Range) {
-    const error = validateRange(next.from, next.to);
+    const error = validateRange(next.from, next.to, section);
     setRangeError(error);
     if (error) return;
     setDraft(next);
@@ -805,11 +805,11 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
         <div className="flex flex-wrap items-center gap-2">
           <form onSubmit={handleSubmit} className="flex w-full items-center gap-1.5 md:w-auto">
-            {/* Nothing before REPORTS_START_DATE can be picked; the server enforces the same limit. */}
+            {/* Nothing before the section's start date can be picked; the server enforces the same limit. */}
             <DatePicker
               label="From"
               value={draft.from}
-              min={REPORTS_START_DATE}
+              min={reportStartDate(section)}
               max={draft.to}
               onChange={(from) => setDraft((d) => ({ ...d, from }))}
               className="min-w-0 flex-1 md:w-52 md:flex-none"
