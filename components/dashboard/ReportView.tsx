@@ -32,6 +32,9 @@ import { cn } from "@/lib/cn";
 
 const PAGE_SIZE = 50;
 
+/** How often an open report quietly re-loads itself. */
+const AUTO_REFRESH_MS = 30_000;
+
 /** Per-row Refresh button in the UTR column (Transfer). Switched off for now; flip to true to bring it back. */
 const ROW_REFRESH_ENABLED = false;
 
@@ -642,6 +645,25 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
       setActionResult((r) => (r?.status === "ok" && r.refreshAt ? null : r));
     }, 10_000);
   }
+  // Every report re-loads itself every 30s, quietly (no loading state; page, tab, search and scroll
+  // stay put). It skips a beat while the browser tab is hidden, a row action is in flight or its
+  // popup is open, and never replaces data with an error — a failed reload just keeps what's shown.
+  const busyRef = useRef(false);
+  const statusRef = useRef(state.status);
+  useEffect(() => {
+    busyRef.current = pendingAction !== null || actionResult !== null;
+    statusRef.current = state.status;
+  });
+  useEffect(() => {
+    const scheduledFor = range;
+    const interval = setInterval(async () => {
+      if (document.hidden || busyRef.current || statusRef.current !== "ready") return;
+      const next = await loadReport(section, scheduledFor);
+      if (next.status === "ready" && rangeRef.current === scheduledFor && !busyRef.current) setState(next);
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [section, range]);
+
   async function runTransferAction(action: TransferAction, uniqueTxnId: string, id: string) {
     if (pendingAction) return;
     setPendingAction({ uniqueTxnId, action });
