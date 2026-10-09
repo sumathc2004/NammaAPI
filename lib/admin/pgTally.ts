@@ -75,7 +75,7 @@ export function tallyTotals(rows: PgTallyRow[]): PgTallyTotals {
   return totals;
 }
 
-/** One group per retailer: those with issues first, then by amount collected. Rows to check first, then newest first. */
+/** One group per retailer, largest amount collected first. Rows newest first. */
 export function groupByRetailer(rows: PgTallyRow[]): PgTallyGroup[] {
   const byUser = new Map<string, PgTallyRow[]>();
   for (const row of rows) {
@@ -84,12 +84,8 @@ export function groupByRetailer(rows: PgTallyRow[]): PgTallyGroup[] {
   }
   return [...byUser.values()]
     .map((groupRows) => {
-      const sorted = [...groupRows].sort(
-        (a, b) =>
-          Number(isTallyIssue(tallyCheck(b))) - Number(isTallyIssue(tallyCheck(a))) ||
-          b.createdDateTime.localeCompare(a.createdDateTime),
-      );
+      const sorted = [...groupRows].sort((a, b) => b.createdDateTime.localeCompare(a.createdDateTime));
       return { vendorName: sorted[0].vendorName, userName: sorted[0].userName, rows: sorted, totals: tallyTotals(sorted) };
     })
-    .sort((a, b) => Number(b.totals.issues > 0) - Number(a.totals.issues > 0) || b.totals.collected - a.totals.collected);
+    .sort((a, b) => b.totals.collected - a.totals.collected);
 }
