@@ -87,7 +87,7 @@ export function ApiBalanceView() {
   const diffMatches = balance?.diff != null && round2(balance.wallet - accountsTotal) === round2(balance.diff);
 
   return (
-    <section aria-labelledby="api-balance-title" className="space-y-4">
+    <section aria-labelledby="api-balance-title" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 id="api-balance-title" className="text-lg font-bold text-text-primary">
@@ -117,31 +117,31 @@ export function ApiBalanceView() {
       )}
 
       {state.status === "loading" && (
-        <div className="grid gap-4 md:grid-cols-3" aria-busy="true" aria-label="Loading API balance">
+        <div className="grid gap-3 md:grid-cols-3" aria-busy="true" aria-label="Loading API balance">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-28 animate-pulse rounded-2xl border border-brand-border bg-white" />
+            <div key={i} className="h-20 animate-pulse rounded-xl border border-brand-border bg-white" />
           ))}
         </div>
       )}
 
       {balance && (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-brand-gradient p-5 text-white shadow-lg shadow-brand-primary/20">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl bg-brand-gradient px-4 py-3 text-white shadow-lg shadow-brand-primary/20">
               <p className="text-xs font-semibold uppercase tracking-wider text-white/75">API wallet</p>
-              <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight">{inr(balance.wallet)}</p>
-              <p className="mt-1 text-xs text-white/70">Platform balance at the API level</p>
+              <p className="mt-0.5 text-3xl font-bold tabular-nums tracking-tight">{inr(balance.wallet)}</p>
+              <p className="text-xs text-white/70">Platform balance at the API level</p>
             </div>
 
-            <div className="rounded-2xl border border-brand-border bg-white p-5">
+            <div className="rounded-xl border border-brand-border bg-white px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">BUL total</p>
-              <p className="mt-2 text-2xl font-bold tabular-nums text-text-primary">{inr(accountsTotal)}</p>
-              <p className="mt-1 text-xs text-text-secondary">
+              <p className="mt-0.5 text-2xl font-bold tabular-nums text-text-primary">{inr(accountsTotal)}</p>
+              <p className="text-xs text-text-secondary">
                 Across {balance.accounts.length} account{balance.accounts.length === 1 ? "" : "s"}
               </p>
             </div>
 
-            <div className="rounded-2xl border border-brand-border bg-white p-5">
+            <div className="rounded-xl border border-brand-border bg-white px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Difference</p>
                 {balance.diff != null && (
@@ -155,25 +155,25 @@ export function ApiBalanceView() {
                   </span>
                 )}
               </div>
-              <p className="mt-2 text-2xl font-bold tabular-nums text-text-primary">
+              <p className="mt-0.5 text-2xl font-bold tabular-nums text-text-primary">
                 {balance.diff != null ? inr(balance.diff) : "—"}
               </p>
-              <p className="mt-1 text-xs text-text-secondary">Wallet − BUL total</p>
+              <p className="text-xs text-text-secondary">Wallet − BUL total</p>
             </div>
           </div>
 
           {balance.accounts.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
               {balance.accounts.map((account) => {
                 const share = accountsTotal > 0 ? (account.amount / accountsTotal) * 100 : 0;
                 return (
-                  <div key={account.key} className="rounded-2xl border border-brand-border bg-white p-4">
+                  <div key={account.key} className="rounded-xl border border-brand-border bg-white px-3.5 py-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-mono text-xs font-semibold text-text-secondary">{account.label}</p>
                       <p className="text-xs tabular-nums text-text-secondary">{share.toFixed(1)}%</p>
                     </div>
-                    <p className="mt-1.5 text-xl font-bold tabular-nums text-text-primary">{inr(account.amount)}</p>
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-brand-light" aria-hidden="true">
+                    <p className="mt-0.5 text-xl font-bold tabular-nums text-text-primary">{inr(account.amount)}</p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-brand-light" aria-hidden="true">
                       <div className="h-full rounded-full bg-brand-gradient" style={{ width: `${Math.min(100, share)}%` }} />
                     </div>
                   </div>
