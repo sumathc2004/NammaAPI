@@ -90,9 +90,9 @@ export function ApiBalanceView() {
     <section aria-labelledby="api-balance-title" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 id="api-balance-title" className="text-lg font-bold text-text-primary">
+          <h1 id="api-balance-title" className="text-lg font-bold text-text-primary">
             API level balance
-          </h2>
+          </h1>
           {state.status === "ready" && (
             <p className="text-xs text-text-secondary">
               Updated {new Date(state.fetchedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" })}
