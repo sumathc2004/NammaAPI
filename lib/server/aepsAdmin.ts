@@ -88,19 +88,16 @@ export type BpayStatusResult = { ok: true; check: BpayStatusCheck } | { ok: fals
 const maskAccount = (value: string) => (value.length > 4 ? `••••${value.slice(-4)}` : value);
 
 /**
- * Admin-only: `bpayStatusCheck_admin?referenceNumber=` — asks the vendor to re-check one card
- * collection (the vendor's CanRefresh flag says when that's useful). GET as given by the vendor;
- * retried as POST if GET is refused (405), like the vendor's other action endpoints. Confirmed
+ * Admin-only: `POST bpayStatusCheck_admin?referenceNumber=&pgOrderId=` — asks the vendor to re-check
+ * one card collection (the vendor's CanRefresh flag says when that's useful). Vendor signature:
+ * [HttpPost] bpayStatusCheck_admin(string referenceNumber, string pgOrderId), where referenceNumber is
+ * the NPPG… reference and pgOrderId the collection ID; parameters in the query string. Confirmed
  * response: { status: "true", statusCode: "200", total: "1", data: [{ collectionId, charge, gst,
  * additionalCharge, status, message, utr, payouts: [{ accountNumber, ifsc, beneficiaryName, status,
  * message, paymentMode, utr, holderName }] }] }. All values are strings.
  */
-export async function checkBpayStatus(referenceNumber: string): Promise<BpayStatusResult> {
-  const params = { referenceNumber };
-  let result = await aepsRequest("bpayStatusCheck_admin", params, { prefer: "json" });
-  if (!result.ok && result.status === 405) {
-    result = await aepsRequest("bpayStatusCheck_admin", params, { method: "POST", prefer: "json" });
-  }
+export async function checkBpayStatus(referenceNumber: string, pgOrderId: string): Promise<BpayStatusResult> {
+  const result = await aepsRequest("bpayStatusCheck_admin", { referenceNumber, pgOrderId }, { method: "POST", prefer: "json" });
   if (!result.ok) return result;
 
   const body = (result.body && typeof result.body === "object" ? result.body : {}) as Record<string, unknown>;

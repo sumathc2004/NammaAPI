@@ -6,7 +6,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 const RATE_LIMIT = { limit: 30, windowMs: 10 * 60 * 1000 };
 const REFERENCE_PATTERN = /^[A-Za-z0-9-]{4,40}$/;
 
-/** POST /api/dashboard/admin/pg-tally/refresh { referenceNumber } → vendor bpayStatusCheck_admin. Admins only. */
+/** POST /api/dashboard/admin/pg-tally/refresh { referenceNumber, collectionId } → vendor bpayStatusCheck_admin. Admins only. */
 export async function POST(request: Request) {
   const rate = checkRateLimit(`admin-pg-refresh:${getClientIp(request)}`, RATE_LIMIT);
   if (rate.limited) {
@@ -25,16 +25,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This is only available to administrators." }, { status: 403 });
   }
 
-  const body = await request.json().catch(() => null);
-  const referenceNumber =
-    typeof (body as Record<string, unknown> | null)?.referenceNumber === "string"
-      ? (body as { referenceNumber: string }).referenceNumber.trim()
-      : "";
-  if (!REFERENCE_PATTERN.test(referenceNumber)) {
-    return NextResponse.json({ error: "Missing or invalid reference number." }, { status: 400 });
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const field = (key: string) => (typeof body?.[key] === "string" ? (body[key] as string).trim() : "");
+  const referenceNumber = field("referenceNumber");
+  const collectionId = field("collectionId");
+  if (!REFERENCE_PATTERN.test(referenceNumber) || !REFERENCE_PATTERN.test(collectionId)) {
+    return NextResponse.json({ error: "Missing or invalid reference number or collection ID." }, { status: 400 });
   }
 
-  const result = await checkBpayStatus(referenceNumber);
+  // The vendor calls the collection ID "pgOrderId".
+  const result = await checkBpayStatus(referenceNumber, collectionId);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
 
   return NextResponse.json({ ok: true, referenceNumber, check: result.check });
