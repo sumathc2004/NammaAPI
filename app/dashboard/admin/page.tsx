@@ -11,9 +11,6 @@ export const metadata = buildMetadata({
   noIndex: true,
 });
 
-/** Columns of the Transfer Reports panel here (the full page keeps all of them). */
-const TRANSFER_COLUMNS = ["Date & Time", "Beneficiary", "Amount", "UTR", "Status"] as const;
-
 export default function AdminPage() {
   return (
     <AdminOnly>
@@ -23,7 +20,7 @@ export default function AdminPage() {
         <div className="grid items-start gap-6 xl:grid-cols-2">
           <PgTallyView />
           <div className="h-[44rem]">
-            <ReportView section="transfer" compact columnLabels={TRANSFER_COLUMNS} />
+            <ReportView section="transfer" compact columnLayout="admin-transfer" />
           </div>
         </div>
       </div>

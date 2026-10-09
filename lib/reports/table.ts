@@ -26,6 +26,8 @@ export type ColumnInfo = {
   /** A second field shown under the value (e.g. IFSC under the account number); its own column in CSV. */
   subKey?: string;
   subLabel?: string;
+  /** How the second field is shown: "amount" formats it as ₹ (e.g. the amount under a beneficiary). */
+  subKind?: "amount";
   /** "code": IDs and numbers, in monospace and never broken across lines. "words": wraps only between words. */
   format?: TextFormat;
 };
@@ -351,7 +353,7 @@ export type ColumnSlot = {
   /** Hide this column in the table on narrower screens, so the table never needs to scroll sideways. */
   hideBelow?: "lg" | "xl" | "2xl";
   /** A second field shown under this one (e.g. IFSC under Account), matched like `keys`. */
-  sub?: { label: string; keys: RegExp[] };
+  sub?: { label: string; keys: RegExp[]; kind?: "amount" };
   /** How text is set: see ColumnInfo["format"]. */
   format?: TextFormat;
 };
@@ -417,6 +419,7 @@ export function layoutColumns(table: ReportTable, slots: ColumnSlot[], minMatche
         ...(match.altKey && { altKey: match.altKey }),
         ...(slot.hideBelow && { hideBelow: slot.hideBelow }),
         ...(match.subKey && slot.sub && { subKey: match.subKey, subLabel: slot.sub.label }),
+        ...(match.subKey && slot.sub?.kind && { subKind: slot.sub.kind }),
         ...(slot.format && { format: slot.format }),
       },
     ];

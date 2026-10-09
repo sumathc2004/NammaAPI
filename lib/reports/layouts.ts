@@ -117,6 +117,41 @@ const transferColumns: ColumnSlot[] = [
   { id: "remarks", label: "Remarks", kind: "text", format: "words", priority: 9, keys: [/^remarks?$/], hideBelow: "2xl" },
 ];
 
+/**
+ * Admin page's compact Transfer Reports panel: fewer, combined columns — the amount under the
+ * beneficiary, and the shop (StoreName) under the vendor's payout partner (Channel).
+ */
+export const adminTransferColumns: ColumnSlot[] = [
+  { id: "dateTime", label: "Date & Time", kind: "date", priority: 1, keys: [/^time$/, /date|time/] },
+  {
+    id: "beneficiary",
+    label: "Beneficiary",
+    kind: "text",
+    format: "words",
+    priority: 2,
+    keys: [/^beneficiaryname$/, /benef.*name/],
+    sub: { label: "Amount", keys: [/^amount$/], kind: "amount" },
+  },
+  {
+    id: "vendor",
+    label: "Vendor",
+    kind: "text",
+    format: "words",
+    priority: 3,
+    keys: [/^channel$/],
+    sub: { label: "Shop", keys: [/^storename$/, /shop|store/] },
+  },
+  { id: "utr", label: "UTR", kind: "text", format: "code", priority: 4, keys: [/^utr$/] },
+  { id: "status", label: "Status", kind: "status", priority: 5, keys: [/^txnstatus$/, /status/] },
+];
+
+/**
+ * Alternative column layouts a page can pick by name (`<ReportView columnLayout="…">`). By name, not
+ * by value: slots hold RegExps, which can't be passed from a Server Component to ReportView.
+ */
+export const columnLayouts = { "admin-transfer": adminTransferColumns } as const;
+export type ColumnLayoutId = keyof typeof columnLayouts;
+
 export const reportLayouts: Partial<Record<DashboardSectionId, ColumnSlot[]>> = {
   transfer: transferColumns,
   "wallet-ledger": ledgerColumns,

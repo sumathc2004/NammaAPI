@@ -27,7 +27,7 @@ import {
   type ReportTable,
   type TransferAction,
 } from "@/lib/reports/table";
-import { reportLayouts, reportViews } from "@/lib/reports/layouts";
+import { columnLayouts, reportLayouts, reportViews, type ColumnLayoutId } from "@/lib/reports/layouts";
 import { cn } from "@/lib/cn";
 
 const PAGE_SIZE = 50;
@@ -152,6 +152,14 @@ function Cell({ column, row, variant = "card" }: { column: ColumnInfo; row: Repo
       const sub = column.subKey ? row[column.subKey] : "";
       const text = <TextValue value={value} format={column.format} variant={variant} />;
       if (!sub) return text;
+      if (column.subKind === "amount") {
+        return (
+          <span className="block">
+            <span className="block">{text}</span>
+            <span className="block font-semibold tabular-nums text-text-primary">{formatAmount(sub)}</span>
+          </span>
+        );
+      }
       // Second field underneath, e.g. the IFSC under the account number.
       return (
         <span className="block">
@@ -546,16 +554,16 @@ function TransferActionButton({
 /** Date-range report screen used by dashboard sections backed by a vendor report endpoint. */
 /**
  * `compact`: for a half-width panel (admin page) — small title, date row stacked under it, and the
- * view fills its parent's height. `columnLabels` keeps only those columns (by label), always shown.
+ * view fills its parent's height. `columnLayout` picks a named column layout instead of the section's own.
  */
 export function ReportView({
   section,
   compact = false,
-  columnLabels,
+  columnLayout,
 }: {
   section: DashboardSectionId;
   compact?: boolean;
-  columnLabels?: readonly string[];
+  columnLayout?: ColumnLayoutId;
 }) {
   const router = useRouter();
   const { label } = getDashboardSection(section);
@@ -718,12 +726,11 @@ export function ReportView({
   }
 
   const table = state.status === "ready" ? state.table : null;
-  const layout = reportLayouts[section];
-  const columns = useMemo(() => {
-    const all = table ? ((layout && layoutColumns(table, layout)) ?? describeColumns(table)) : [];
-    if (!columnLabels) return all;
-    return all.filter((c) => columnLabels.includes(c.label)).map((c) => ({ ...c, hideBelow: undefined }));
-  }, [table, layout, columnLabels]);
+  const layout = columnLayout ? columnLayouts[columnLayout] : reportLayouts[section];
+  const columns = useMemo(
+    () => (table ? ((layout && layoutColumns(table, layout)) ?? describeColumns(table)) : []),
+    [table, layout],
+  );
 
   // Rows of the selected tab (e.g. Transfer's All / Queue / Refundable), then the search on top.
   const viewRows = useMemo(() => {
