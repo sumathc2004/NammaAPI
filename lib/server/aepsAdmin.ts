@@ -2,6 +2,7 @@ import "server-only";
 import { aepsRequest, AEPS_UNEXPECTED_ERROR } from "@/lib/server/aepsClient";
 import { accountLabel, type ApiLevelBalance } from "@/lib/admin/apiBalance";
 import type { BpayStatusCheck, PgTallyRow } from "@/lib/admin/pgTally";
+import type { DaySummary } from "@/lib/admin/daySummary";
 import type { SessionCredentials } from "@/lib/server/session";
 
 export type ApiBalanceResult = { ok: true; balance: ApiLevelBalance } | { ok: false; error: string };
@@ -140,6 +141,59 @@ export async function checkBpayStatus(referenceNumber: string, pgOrderId: string
       gst: toNumber(record.gst),
       additionalCharge: toNumber(record.additionalCharge),
       payouts,
+    },
+  };
+}
+
+export type DaySummaryResult = { ok: true; summary: DaySummary } | { ok: false; error: string };
+
+/**
+ * Admin-only: `POST TransferPgDaySummary?userName=&password=&from=yyyy-MM-dd&to=yyyy-MM-dd`
+ * (GET returns 405; parameters in the query string, lower-case userName/password). JSON array,
+ * one row per day: { ReportDate, TransferCount, TransferSuccessCount, TransferQueueCount,
+ * TransferAmount, TransferSuccessAmount, PgCount, PgSuccessCount, PgPendingCount, PgAmount,
+ * PgSuccessAmount, WalletCreditedCount, CardCount, CardSuccessCount, CardPendingCount, CardAmount,
+ * CardSuccessAmount } — all numbers. Rows are summed, so a range of days works too.
+ */
+export async function fetchDaySummary(credentials: SessionCredentials, from: string, to: string): Promise<DaySummaryResult> {
+  const result = await aepsRequest(
+    "TransferPgDaySummary",
+    { userName: credentials.userName, password: credentials.password, from, to },
+    { method: "POST", prefer: "json" },
+  );
+  if (!result.ok) return result;
+  if (!Array.isArray(result.body)) {
+    console.error("AEPS TransferPgDaySummary did not return a list.");
+    return { ok: false, error: AEPS_UNEXPECTED_ERROR };
+  }
+
+  const rows = result.body as Record<string, unknown>[];
+  const sum = (key: string) => rows.reduce((total, row) => total + (toNumber(row[key]) ?? 0), 0);
+  return {
+    ok: true,
+    summary: {
+      transfers: {
+        count: sum("TransferCount"),
+        success: sum("TransferSuccessCount"),
+        waiting: sum("TransferQueueCount"),
+        amount: sum("TransferAmount"),
+        successAmount: sum("TransferSuccessAmount"),
+      },
+      pg: {
+        count: sum("PgCount"),
+        success: sum("PgSuccessCount"),
+        waiting: sum("PgPendingCount"),
+        amount: sum("PgAmount"),
+        successAmount: sum("PgSuccessAmount"),
+        walletCredited: sum("WalletCreditedCount"),
+      },
+      card: {
+        count: sum("CardCount"),
+        success: sum("CardSuccessCount"),
+        waiting: sum("CardPendingCount"),
+        amount: sum("CardAmount"),
+        successAmount: sum("CardSuccessAmount"),
+      },
     },
   };
 }

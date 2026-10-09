@@ -1,6 +1,7 @@
 import { buildMetadata } from "@/lib/metadata";
 import { AdminOnly } from "@/components/dashboard/AdminOnly";
 import { ApiBalanceView } from "@/components/dashboard/ApiBalanceView";
+import { DaySummaryView } from "@/components/dashboard/DaySummaryView";
 import { PgTallyView } from "@/components/dashboard/PgTallyView";
 import { ReportView } from "@/components/dashboard/ReportView";
 
@@ -16,6 +17,7 @@ export default function AdminPage() {
     <AdminOnly>
       <div className="space-y-6">
         <ApiBalanceView />
+        <DaySummaryView />
         {/* PG Tally and Transfer Reports side by side on wide screens, stacked below that. */}
         <div className="grid items-start gap-6 xl:grid-cols-2">
           <PgTallyView />
