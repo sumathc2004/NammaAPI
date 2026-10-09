@@ -272,6 +272,7 @@ function RowCard({
   onRefresh,
   pendingAction,
   onAction,
+  timeOnly = false,
 }: {
   row: ReportRow;
   layout: CardLayout;
@@ -280,6 +281,8 @@ function RowCard({
   onRefresh: (uniqueTxnId: string) => void;
   pendingAction: { uniqueTxnId: string; action: TransferAction } | null;
   onAction: (action: TransferAction, uniqueTxnId: string, id: string) => void;
+  /** Show just the time on the date line (single-day compact panel). */
+  timeOnly?: boolean;
 }) {
   const { title, date, amount, badges, details, codes } = layout;
   const refreshable = ROW_REFRESH_ENABLED && section === "transfer" && isRefreshableTransfer(row);
@@ -300,7 +303,13 @@ function RowCard({
           )}
           {date && (
             <p className="mt-0.5 text-xs">
-              <Cell column={date} row={row} />
+              {timeOnly ? (
+                <span className="tabular-nums text-text-secondary">
+                  {dateCellText(date, row).split(", ")[1] ?? dateCellText(date, row)}
+                </span>
+              ) : (
+                <Cell column={date} row={row} />
+              )}
             </p>
           )}
         </div>
@@ -1016,7 +1025,10 @@ export function ReportView({
 
         {/* Phones: one card per entry */}
         {table && filteredRows.length > 0 && (
-          <ul className="space-y-2.5 pt-3 md:hidden" aria-label={`${label} entries`}>
+          <ul
+            className={cn("space-y-2.5 pt-3 md:hidden", compact && "scrollbar-light max-h-[34rem] overflow-y-auto pr-1")}
+            aria-label={`${label} entries`}
+          >
             {pageRows.map((row, i) => (
               <RowCard
                 key={currentPage * PAGE_SIZE + i}
@@ -1027,6 +1039,7 @@ export function ReportView({
                 onRefresh={refreshRow}
                 pendingAction={pendingAction}
                 onAction={runTransferAction}
+                timeOnly={timeOnly}
               />
             ))}
           </ul>

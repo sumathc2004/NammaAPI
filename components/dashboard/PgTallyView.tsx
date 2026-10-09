@@ -328,7 +328,7 @@ export function PgTallyView() {
   const timeOnly = range.from === range.to;
 
   return (
-    <section aria-labelledby="pg-tally-title" className="@container flex flex-col gap-2">
+    <section aria-labelledby="pg-tally-title" className="@container flex min-w-0 flex-col gap-2">
       {/* Title only: the tally always shows today. */}
       <div>
         <h2
@@ -549,7 +549,7 @@ export function PgTallyView() {
             </div>
 
             {/* Phones: one card per collection */}
-            <ul className="space-y-2.5 pt-3 @lg:hidden" aria-label="PG tally entries">
+            <ul className="scrollbar-light max-h-[34rem] space-y-2.5 overflow-y-auto pr-1 pt-3 @lg:hidden" aria-label="PG tally entries">
               {visible.map((row) => {
                 const { date, time } = dateParts(row.createdDateTime);
                 const issue = isTallyIssue(tallyCheck(row));
@@ -562,7 +562,7 @@ export function PgTallyView() {
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-text-primary">{row.vendorName}</p>
                         <p className="text-xs text-text-secondary">
-                          {date}, {time}
+                          {timeOnly ? time : `${date}, ${time}`}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1.5">

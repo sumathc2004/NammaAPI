@@ -19,9 +19,10 @@ export default function AdminPage() {
         <ApiBalanceView />
         <DaySummaryView />
         {/* PG Tally and Transfer Reports side by side on wide screens, stacked below that. */}
-        <div className="grid items-start gap-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
           <PgTallyView />
-          <div className="h-[44rem]">
+          {/* Fixed height (rows scroll inside) from tablet up; phones let the panel size itself. */}
+          <div className="min-w-0 md:h-[40rem] xl:h-[44rem]">
             <ReportView section="transfer" compact columnLayout="admin-transfer" />
           </div>
         </div>
