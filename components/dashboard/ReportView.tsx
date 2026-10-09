@@ -1026,7 +1026,7 @@ export function ReportView({
         {/* Phones: one card per entry */}
         {table && filteredRows.length > 0 && (
           <ul
-            className={cn("space-y-2.5 pt-3 md:hidden", compact && "scrollbar-light max-h-[34rem] overflow-y-auto pr-1")}
+            className="space-y-2.5 pt-3 md:hidden"
             aria-label={`${label} entries`}
           >
             {pageRows.map((row, i) => (

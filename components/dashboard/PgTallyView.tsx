@@ -16,6 +16,9 @@ import { cn } from "@/lib/cn";
 /** How often the tally quietly re-loads itself. */
 const AUTO_REFRESH_MS = 30_000;
 
+/** Phone cards shown per "Show more". */
+const MOBILE_PAGE = 30;
+
 type Range = { from: string; to: string };
 type LoadState = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; rows: PgTallyRow[] };
 
@@ -248,6 +251,7 @@ export function PgTallyView() {
   const [viewId, setViewId] = useState<ViewId>("all");
   const [retailer, setRetailer] = useState("");
   const [query, setQuery] = useState("");
+  const [mobileLimit, setMobileLimit] = useState(MOBILE_PAGE);
 
   useEffect(() => {
     let cancelled = false;
@@ -549,8 +553,9 @@ export function PgTallyView() {
             </div>
 
             {/* Phones: one card per collection */}
-            <ul className="scrollbar-light max-h-[34rem] space-y-2.5 overflow-y-auto pr-1 pt-3 @lg:hidden" aria-label="PG tally entries">
-              {visible.map((row) => {
+            {/* Phones: cards scroll with the page (no inner scroll box), 30 at a time. */}
+            <ul className="space-y-2.5 pt-3 @lg:hidden" aria-label="PG tally entries">
+              {visible.slice(0, mobileLimit).map((row) => {
                 const { date, time } = dateParts(row.createdDateTime);
                 const issue = isTallyIssue(tallyCheck(row));
                 return (
@@ -593,6 +598,15 @@ export function PgTallyView() {
                 );
               })}
             </ul>
+            {visible.length > mobileLimit && (
+              <button
+                type="button"
+                onClick={() => setMobileLimit((n) => n + MOBILE_PAGE)}
+                className="mt-2.5 h-10 w-full rounded-lg border border-brand-border bg-white text-sm font-semibold text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light @lg:hidden"
+              >
+                Show more ({visible.length - mobileLimit} left)
+              </button>
+            )}
           </>
         )}
       </div>
