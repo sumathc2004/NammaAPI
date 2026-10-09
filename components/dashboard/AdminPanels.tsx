@@ -44,11 +44,11 @@ export function AdminPanels() {
       </div>
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-        <div className={cn("min-w-0", active !== "pg" && "hidden xl:block")}>
+        <div className={cn("min-w-0 xl:h-[max(26rem,calc(100dvh-23rem))]", active !== "pg" && "hidden xl:block")}>
           <PgTallyView />
         </div>
-        {/* Fixed height (rows scroll inside) from tablet up — side by side (xl), down to the bottom of the screen; phones let the panel size itself. */}
-        <div className={cn("min-w-0 md:h-[40rem] xl:h-[max(26rem,calc(100dvh-28.5rem))]", active !== "transfer" && "hidden xl:block")}>
+        {/* Fixed height (rows scroll inside) from tablet up; side by side (xl) both panels share one height, down to the bottom of the screen. Phones let the panel size itself. */}
+        <div className={cn("min-w-0 md:h-[40rem] xl:h-[max(26rem,calc(100dvh-23rem))]", active !== "transfer" && "hidden xl:block")}>
           <ReportView section="transfer" compact columnLayout="admin-transfer" />
         </div>
       </div>

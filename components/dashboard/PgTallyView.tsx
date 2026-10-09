@@ -332,9 +332,9 @@ export function PgTallyView() {
   const timeOnly = range.from === range.to;
 
   return (
-    <section aria-labelledby="pg-tally-title" className="@container flex min-w-0 flex-col gap-2">
-      {/* Title only: the tally always shows today. */}
-      <div>
+    <section aria-labelledby="pg-tally-title" className="@container flex min-w-0 flex-col gap-2 xl:h-full">
+      {/* Title and totals (no dates: the tally always shows today). */}
+      <div className="flex min-w-0 items-center justify-between gap-2">
         <h2
           id="pg-tally-title"
           title="Card collections vs wallet credits (today)"
@@ -342,9 +342,24 @@ export function PgTallyView() {
         >
           PG Tally
         </h2>
+        {ready && rows.length > 0 && (
+          <dl
+            title="Totals for today and the selected retailer"
+            className="flex min-w-0 items-center divide-x divide-brand-border text-xs"
+          >
+            <div className="flex min-w-0 items-baseline gap-1.5 pr-2.5">
+              <dt className="text-text-secondary">Collected</dt>
+              <dd className="truncate font-semibold tabular-nums text-text-primary">{inr(totals.collected)}</dd>
+            </div>
+            <div className="flex min-w-0 items-baseline gap-1.5 pl-2.5">
+              <dt className="text-text-secondary">Credited</dt>
+              <dd className="truncate font-semibold tabular-nums text-status-success">{inr(totals.credited)}</dd>
+            </div>
+          </dl>
+        )}
       </div>
 
-      <div className="@lg:overflow-hidden @lg:rounded-2xl @lg:border @lg:border-brand-border @lg:bg-white @lg:shadow-sm">
+      <div className="xl:flex xl:min-h-0 xl:flex-1 xl:flex-col @lg:overflow-hidden @lg:rounded-2xl @lg:border @lg:border-brand-border @lg:bg-white @lg:shadow-sm">
         {/* Toolbar: tabs, retailer, search, totals */}
         <div className="flex flex-wrap items-center gap-2 @lg:border-b @lg:border-brand-border @lg:px-3 @lg:py-2.5 @6xl:flex-nowrap">
           <div
@@ -428,21 +443,6 @@ export function PgTallyView() {
             />
           </div>
 
-          {ready && rows.length > 0 && (
-            <dl
-              title="Totals for the selected dates and retailer"
-              className="flex h-9 w-full min-w-0 shrink-0 items-center divide-x divide-brand-border rounded-lg border border-brand-border bg-white text-xs @5xl:ml-auto @5xl:w-auto"
-            >
-              <div className="flex min-w-0 items-baseline gap-1.5 px-2.5">
-                <dt className="text-text-secondary">Collected</dt>
-                <dd className="truncate font-semibold tabular-nums text-text-primary">{inr(totals.collected)}</dd>
-              </div>
-              <div className="flex min-w-0 items-baseline gap-1.5 px-2.5">
-                <dt className="text-text-secondary">Credited</dt>
-                <dd className="truncate font-semibold tabular-nums text-status-success">{inr(totals.credited)}</dd>
-              </div>
-            </dl>
-          )}
         </div>
 
         {state.status === "loading" && (
@@ -472,7 +472,7 @@ export function PgTallyView() {
         {ready && visible.length > 0 && (
           <>
             {/* Tablet and up: table */}
-            <div className="scrollbar-light hidden max-h-[32rem] overflow-auto @lg:block xl:max-h-[max(16rem,calc(100dvh-39.75rem))]">
+            <div className="scrollbar-light hidden max-h-[32rem] overflow-auto @lg:block xl:max-h-none xl:min-h-0 xl:flex-1">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-brand-light/95 backdrop-blur">
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
