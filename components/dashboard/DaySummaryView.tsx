@@ -84,15 +84,13 @@ const STAT_TONES = {
 
 function Stat({ icon, tone, value, label }: { icon: IconName; tone: keyof typeof STAT_TONES; value: number; label: string }) {
   return (
-    <div className="min-w-0 rounded-lg bg-brand-light/60 px-2.5 py-2">
-      <div className="flex items-center gap-1.5">
-        <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-md", STAT_TONES[tone])}>
-          <Icon name={icon} size={13} />
-        </span>
-        <p className="text-sm font-bold tabular-nums text-text-primary">{count(value)}</p>
-      </div>
-      <p className="mt-1 truncate text-[11px] text-text-secondary">{label}</p>
-    </div>
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+      <span className={cn("flex size-[18px] shrink-0 items-center justify-center rounded", STAT_TONES[tone])}>
+        <Icon name={icon} size={11} />
+      </span>
+      <span className="font-semibold tabular-nums text-text-primary">{count(value)}</span>
+      <span className="text-text-secondary">{label}</span>
+    </span>
   );
 }
 
@@ -102,34 +100,33 @@ function SummaryCard({
   icon,
   part,
   waitingLabel,
-  footer,
+  extra,
 }: {
   title: string;
   subtitle: string;
   icon: IconName;
   part: DaySummaryPart;
   waitingLabel: string;
-  footer?: React.ReactNode;
+  /** Shown at the end of the stats line (PG: credited to wallets). */
+  extra?: React.ReactNode;
 }) {
   const failed = Math.max(0, part.count - part.success - part.waiting);
   const pct = (n: number) => (part.count > 0 ? (n / part.count) * 100 : 0);
   const rate = pct(part.success);
   return (
-    <div className="flex flex-col rounded-xl border border-brand-border bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand-primary/20">
-            <Icon name={icon} size={19} />
-          </span>
-          <div>
-            <p className="text-sm font-bold text-text-primary">{title}</p>
-            <p className="text-xs text-text-secondary">{subtitle}</p>
-          </div>
+    <div className="rounded-xl border border-brand-border bg-white px-3.5 py-3">
+      <div className="flex items-center gap-2.5">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-gradient text-white">
+          <Icon name={icon} size={16} />
+        </span>
+        <div className="min-w-0 leading-tight">
+          <p className="text-sm font-semibold text-text-primary">{title}</p>
+          <p className="truncate text-[11px] text-text-secondary">{subtitle}</p>
         </div>
         {part.count > 0 && (
           <span
             className={cn(
-              "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
+              "ml-auto shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
               rate >= 90 ? "bg-status-success-bg text-status-success" : "bg-amber-50 text-amber-700",
             )}
             title="Success rate"
@@ -139,12 +136,19 @@ function SummaryCard({
         )}
       </div>
 
-      <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Successful today</p>
-      <p className="text-2xl font-bold tabular-nums tracking-tight text-text-primary">{inr(part.successAmount)}</p>
+      <div className="mt-2.5 flex flex-wrap items-baseline justify-between gap-x-3">
+        <p className="text-xl font-bold tabular-nums tracking-tight text-text-primary" title="Successful today">
+          {inr(part.successAmount)}
+        </p>
+        <p className="flex items-center gap-1 text-[11px] text-text-secondary" title="All attempts today">
+          <Icon name="sum" size={11} />
+          {count(part.count)} · <span className="font-medium tabular-nums text-text-primary">{inr(part.amount)}</span>
+        </p>
+      </div>
 
       {/* Success / waiting / failed share of today's count. */}
       <div
-        className="mt-3 flex h-2 overflow-hidden rounded-full bg-brand-light"
+        className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-brand-light"
         role="img"
         aria-label={`${part.success} successful, ${part.waiting} ${waitingLabel}, ${failed} failed of ${part.count}`}
       >
@@ -153,21 +157,11 @@ function SummaryCard({
         <div className="bg-status-failed" style={{ width: `${pct(failed)}%` }} />
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <Stat icon="check" tone="success" value={part.success} label="Successful" />
-        <Stat icon="clock" tone="waiting" value={part.waiting} label={waitingLabel[0].toUpperCase() + waitingLabel.slice(1)} />
-        <Stat icon="cross" tone="failed" value={failed} label="Failed" />
-      </div>
-
-      <div className="mt-auto space-y-1.5 pt-3">
-        <div className="flex items-center justify-between gap-2 border-t border-brand-border pt-2.5 text-xs">
-          <span className="flex items-center gap-1.5 text-text-secondary">
-            <Icon name="sum" size={13} />
-            {count(part.count)} attempted
-          </span>
-          <span className="font-semibold tabular-nums text-text-primary">{inr(part.amount)}</span>
-        </div>
-        {footer}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+        <Stat icon="check" tone="success" value={part.success} label="success" />
+        <Stat icon="clock" tone="waiting" value={part.waiting} label={waitingLabel} />
+        <Stat icon="cross" tone="failed" value={failed} label="failed" />
+        {extra}
       </div>
     </div>
   );
@@ -202,15 +196,15 @@ export function DaySummaryView() {
   }, []);
 
   return (
-    <section aria-labelledby="day-summary-title" className="space-y-2">
-      <h2 id="day-summary-title" className="text-lg font-bold tracking-tight text-text-primary">
+    <section aria-labelledby="day-summary-title" className="space-y-1.5">
+      <h2 id="day-summary-title" className="text-base font-bold tracking-tight text-text-primary">
         Today&apos;s Summary
       </h2>
 
       {state.status === "loading" && (
         <div className="grid gap-3 xl:grid-cols-3" aria-busy="true" aria-label="Loading today's summary">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-56 animate-pulse rounded-xl border border-brand-border bg-white" />
+            <div key={i} className="h-[7.5rem] animate-pulse rounded-xl border border-brand-border bg-white" />
           ))}
         </div>
       )}
@@ -236,22 +230,17 @@ export function DaySummaryView() {
             icon="pg"
             part={state.summary.pg}
             waitingLabel="pending"
-            footer={
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="flex items-center gap-1.5 text-text-secondary">
-                  <Icon name="wallet" size={13} />
-                  Credited to wallets
-                </span>
-                <span
-                  className={cn(
-                    "font-semibold tabular-nums",
-                    state.summary.pg.walletCredited === state.summary.pg.success ? "text-status-success" : "text-status-failed",
-                  )}
-                >
-                  {state.summary.pg.walletCredited === state.summary.pg.success ? "✓ " : ""}
-                  {count(state.summary.pg.walletCredited)} of {count(state.summary.pg.success)}
-                </span>
-              </div>
+            extra={
+              <span
+                className={cn(
+                  "ml-auto inline-flex items-center gap-1 whitespace-nowrap font-semibold tabular-nums",
+                  state.summary.pg.walletCredited === state.summary.pg.success ? "text-status-success" : "text-status-failed",
+                )}
+                title="Successful collections credited to wallets"
+              >
+                <Icon name="wallet" size={12} />
+                {count(state.summary.pg.walletCredited)}/{count(state.summary.pg.success)} credited
+              </span>
             }
           />
           <SummaryCard

@@ -14,7 +14,7 @@ export const metadata = buildMetadata({
 export default function AdminPage() {
   return (
     <AdminOnly>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <ApiBalanceView />
         <DaySummaryView />
         <AdminPanels />

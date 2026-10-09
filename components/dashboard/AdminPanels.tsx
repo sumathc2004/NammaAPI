@@ -47,8 +47,8 @@ export function AdminPanels() {
         <div className={cn("min-w-0", active !== "pg" && "hidden xl:block")}>
           <PgTallyView />
         </div>
-        {/* Fixed height (rows scroll inside) from tablet up; phones let the panel size itself. */}
-        <div className={cn("min-w-0 md:h-[40rem] xl:h-[44rem]", active !== "transfer" && "hidden xl:block")}>
+        {/* Fixed height (rows scroll inside) from tablet up — side by side (xl), down to the bottom of the screen; phones let the panel size itself. */}
+        <div className={cn("min-w-0 md:h-[40rem] xl:h-[max(26rem,calc(100dvh-28.5rem))]", active !== "transfer" && "hidden xl:block")}>
           <ReportView section="transfer" compact columnLayout="admin-transfer" />
         </div>
       </div>

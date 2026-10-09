@@ -847,7 +847,7 @@ export function ReportView({
       {/* Title + date range */}
       <div className={cn("flex flex-col", compact ? "gap-2" : "gap-3 xl:flex-row xl:items-center xl:justify-between")}>
         {compact ? (
-          <h2 className="text-lg font-bold tracking-tight text-text-primary">{label}</h2>
+          <h2 className="text-base font-bold tracking-tight text-text-primary">{label}</h2>
         ) : (
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand-primary/25 md:h-10 md:w-10">

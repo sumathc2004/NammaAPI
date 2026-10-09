@@ -338,7 +338,7 @@ export function PgTallyView() {
         <h2
           id="pg-tally-title"
           title="Card collections vs wallet credits (today)"
-          className="text-lg font-bold tracking-tight text-text-primary"
+          className="text-base font-bold tracking-tight text-text-primary"
         >
           PG Tally
         </h2>
@@ -472,7 +472,7 @@ export function PgTallyView() {
         {ready && visible.length > 0 && (
           <>
             {/* Tablet and up: table */}
-            <div className="scrollbar-light hidden max-h-[32rem] overflow-auto @lg:block @5xl:max-h-[34rem]">
+            <div className="scrollbar-light hidden max-h-[32rem] overflow-auto @lg:block xl:max-h-[max(16rem,calc(100dvh-39.75rem))]">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-brand-light/95 backdrop-blur">
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">

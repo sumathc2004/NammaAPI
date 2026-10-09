@@ -113,11 +113,11 @@ export function ApiBalanceView() {
     <section aria-labelledby="api-balance-title" className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-baseline gap-3">
-          <h1 id="api-balance-title" className="text-lg font-bold tracking-tight text-text-primary">
+          <h1 id="api-balance-title" className="text-base font-bold tracking-tight text-text-primary">
             API Level Balance
           </h1>
           {state.status === "ready" && (
-            <p className="text-xs text-text-secondary">
+            <p className="text-[11px] text-text-secondary">
               Updated {new Date(state.fetchedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" })}
             </p>
           )}
@@ -126,7 +126,7 @@ export function ApiBalanceView() {
           type="button"
           onClick={refresh}
           disabled={state.status === "loading"}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-brand-border bg-white px-3 text-sm font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-60"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-brand-border bg-white px-2.5 text-xs font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-60"
         >
           <RefreshIcon spinning={state.status === "loading"} />
           Refresh
@@ -142,7 +142,7 @@ export function ApiBalanceView() {
       {state.status === "loading" && (
         <div className="grid gap-3 md:grid-cols-3" aria-busy="true" aria-label="Loading API balance">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl border border-brand-border bg-white" />
+            <div key={i} className="h-16 animate-pulse rounded-xl border border-brand-border bg-white" />
           ))}
         </div>
       )}
@@ -152,9 +152,9 @@ export function ApiBalanceView() {
         // on narrower screens they wrap. Order: Difference, API wallet, BUL total (with the BUL
         // accounts inside), then the other balances (RUPE, unsettled, pending).
         <div className="flex flex-wrap gap-1.5 whitespace-nowrap min-[1680px]:gap-2.5">
-          <div className="flex-auto rounded-xl border border-brand-border bg-white px-3 py-2.5 min-[1680px]:px-4">
+          <div className="flex-auto rounded-xl border border-brand-border bg-white px-3 py-2 min-[1680px]:px-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Difference</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Difference</p>
               {balance.diff != null && (
                 <span
                   className={cn(
@@ -167,31 +167,31 @@ export function ApiBalanceView() {
                 </span>
               )}
             </div>
-            <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", "text-text-primary")}>
+            <p className={cn("mt-0.5 text-base font-bold tabular-nums", "text-text-primary")}>
               {balance.diff != null ? inr(balance.diff) : "—"}
             </p>
-            <p className="text-xs text-text-secondary">Wallet − balances</p>
+            <p className="text-[11px] text-text-secondary">Wallet − balances</p>
           </div>
 
-          <div className="flex-auto rounded-xl bg-brand-gradient px-3 py-2.5 text-white shadow-lg shadow-brand-primary/20 min-[1680px]:px-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/75">API wallet</p>
-            <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight min-[1680px]:text-2xl">{inr(balance.wallet)}</p>
-            <p className="text-xs text-white/70">Platform balance</p>
+          <div className="flex-auto rounded-xl bg-brand-gradient px-3 py-2 text-white shadow-lg shadow-brand-primary/20 min-[1680px]:px-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-white/75">API wallet</p>
+            <p className="mt-0.5 text-lg font-bold leading-snug tabular-nums tracking-tight">{inr(balance.wallet)}</p>
+            <p className="text-[11px] text-white/70">Platform balance</p>
           </div>
 
           {bulAccounts.length > 0 && (
-            <div className="flex flex-auto flex-wrap gap-x-2.5 gap-y-2 rounded-xl border border-brand-border bg-white px-3 py-2.5 min-[1680px]:gap-x-4 min-[1680px]:px-4">
+            <div className="flex flex-auto flex-wrap gap-x-2.5 gap-y-2 rounded-xl border border-brand-border bg-white px-3 py-2 min-[1680px]:gap-x-4 min-[1680px]:px-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">BUL total</p>
-                <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", "text-text-primary")}>{inr(bulTotal)}</p>
-                <p className="text-xs text-text-secondary">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">BUL total</p>
+                <p className={cn("mt-0.5 text-base font-bold tabular-nums", "text-text-primary")}>{inr(bulTotal)}</p>
+                <p className="text-[11px] text-text-secondary">
                   {bulAccounts.length} account{bulAccounts.length === 1 ? "" : "s"}
                 </p>
               </div>
               {bulAccounts.map((account) => (
                 <div key={account.key} className="flex-1 border-l border-brand-border pl-2.5 min-[1680px]:pl-4">
-                  <p className="font-mono text-xs font-semibold text-text-secondary">{account.label}</p>
-                  <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", "text-text-primary")}>{inr(account.amount)}</p>
+                  <p className="font-mono text-[11px] font-semibold text-text-secondary">{account.label}</p>
+                  <p className={cn("mt-0.5 text-base font-bold tabular-nums", "text-text-primary")}>{inr(account.amount)}</p>
                   {/* Share of the BUL total. */}
                   <ShareBar share={bulTotal > 0 ? (account.amount / bulTotal) * 100 : 0} />
                 </div>
@@ -206,14 +206,14 @@ export function ApiBalanceView() {
               <div
                 key={account.key}
                 className={cn(
-                  "flex-auto rounded-xl border px-3 py-2.5 min-[1680px]:px-3.5",
+                  "flex-auto rounded-xl border px-3 py-2 min-[1680px]:px-3.5",
                   held ? "border-amber-200 bg-amber-50" : "border-brand-border bg-white",
                 )}
               >
-                <p className={cn("font-mono text-xs font-semibold", held ? "text-amber-700" : "text-text-secondary")}>
+                <p className={cn("font-mono text-[11px] font-semibold", held ? "text-amber-700" : "text-text-secondary")}>
                   {account.label}
                 </p>
-                <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", held ? "text-amber-900" : "text-text-primary")}>
+                <p className={cn("mt-0.5 text-base font-bold tabular-nums", held ? "text-amber-900" : "text-text-primary")}>
                   {inr(account.amount)}
                 </p>
                 {/* Share of all balances (BUL accounts and these). */}
