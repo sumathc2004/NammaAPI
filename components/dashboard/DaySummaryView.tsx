@@ -24,13 +24,50 @@ async function loadSummary(): Promise<LoadState> {
 
 const inr = (amount: number) => amount.toLocaleString("en-IN", { style: "currency", currency: "INR" });
 
+/** Line icons (24×24, stroke) for the three cards. */
+const ICONS = {
+  // Arrows both ways: money sent out to beneficiaries.
+  transfers: <path d="M7 7h13m0 0-4-4m4 4-4 4M17 17H4m0 0 4-4m-4 4 4 4" />,
+  // Arrow into a tray: money collected through the payment gateway.
+  pg: <path d="M12 3v11m0 0-4-4m4 4 4-4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />,
+  // Credit card.
+  card: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 10h18M7 15h3" />
+    </>
+  ),
+};
+
+function SummaryIcon({ name }: { name: keyof typeof ICONS }) {
+  return (
+    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand-primary">
+      <svg
+        width="17"
+        height="17"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {ICONS[name]}
+      </svg>
+    </span>
+  );
+}
+
 function SummaryCard({
   title,
+  icon,
   part,
   waitingLabel,
   extra,
 }: {
   title: string;
+  icon: keyof typeof ICONS;
   part: DaySummaryPart;
   waitingLabel: string;
   extra?: React.ReactNode;
@@ -39,14 +76,17 @@ function SummaryCard({
   return (
     <div className="rounded-xl border border-brand-border bg-white px-4 py-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">{title}</p>
+        <div className="flex items-center gap-2.5">
+          <SummaryIcon name={icon} />
+          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">{title}</p>
+        </div>
         {part.waiting > 0 && (
           <span className="rounded-full bg-status-pending-bg px-2 py-0.5 text-[11px] font-semibold text-status-pending">
             {part.waiting} {waitingLabel}
           </span>
         )}
       </div>
-      <p className="mt-0.5 text-2xl font-bold tabular-nums text-text-primary">{inr(part.successAmount)}</p>
+      <p className="mt-1.5 text-2xl font-bold tabular-nums text-text-primary">{inr(part.successAmount)}</p>
       <p className="text-xs text-text-secondary">
         <span className="font-semibold text-status-success">{part.success}</span> of {part.count} successful
         {failed > 0 && <span className="text-status-failed"> · {failed} failed</span>}
@@ -107,9 +147,10 @@ export function DaySummaryView() {
 
       {state.status === "ready" && (
         <div className="grid gap-3 md:grid-cols-3">
-          <SummaryCard title="Transfers" part={state.summary.transfers} waitingLabel="in queue" />
+          <SummaryCard title="Transfers" icon="transfers" part={state.summary.transfers} waitingLabel="in queue" />
           <SummaryCard
             title="PG collections"
+            icon="pg"
             part={state.summary.pg}
             waitingLabel="pending"
             extra={
@@ -124,7 +165,7 @@ export function DaySummaryView() {
               </p>
             }
           />
-          <SummaryCard title="Card payments" part={state.summary.card} waitingLabel="pending" />
+          <SummaryCard title="Card payments" icon="card" part={state.summary.card} waitingLabel="pending" />
         </div>
       )}
     </section>
