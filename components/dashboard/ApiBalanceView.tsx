@@ -30,6 +30,23 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Unsettled / pending balances (the vendor spells one "pendnig"), shown apart from the BUL accounts. */
 const isHeldBalance = (key: string) => /unsettl|pend/i.test(key);
+/** The BUL accounts (`bul_0080` …), grouped inside the BUL total card. */
+const isBulAccount = (key: string) => /^bul/i.test(key);
+
+/** Share of a total as a thin bar with the percentage beside it. */
+function ShareBar({ share, held = false }: { share: number; held?: boolean }) {
+  return (
+    <div className="mt-1 flex items-center gap-1.5">
+      <div className={cn("h-1.5 min-w-8 flex-1 overflow-hidden rounded-full", held ? "bg-amber-100" : "bg-brand-light")} aria-hidden="true">
+        <div
+          className={cn("h-full rounded-full", held ? "bg-amber-500" : "bg-brand-gradient")}
+          style={{ width: `${Math.min(100, share)}%` }}
+        />
+      </div>
+      <p className={cn("text-[11px] tabular-nums", held ? "text-amber-700" : "text-text-secondary")}>{share.toFixed(1)}%</p>
+    </div>
+  );
+}
 
 function RefreshIcon({ spinning }: { spinning: boolean }) {
   return (
@@ -87,6 +104,9 @@ export function ApiBalanceView() {
 
   const balance = state.status === "ready" ? state.balance : null;
   const accountsTotal = balance ? round2(balance.accounts.reduce((sum, a) => sum + a.amount, 0)) : 0;
+  const bulAccounts = balance ? balance.accounts.filter((a) => isBulAccount(a.key)) : [];
+  const otherAccounts = balance ? balance.accounts.filter((a) => !isBulAccount(a.key)) : [];
+  const bulTotal = round2(bulAccounts.reduce((sum, a) => sum + a.amount, 0));
   const diffMatches = balance?.diff != null && round2(balance.wallet - accountsTotal) === round2(balance.diff);
 
   return (
@@ -129,22 +149,9 @@ export function ApiBalanceView() {
 
       {balance && (
         // One row on wide screens: each card is as wide as its content and grows to fill the line;
-        // on narrower screens they wrap.
+        // on narrower screens they wrap. Order: Difference, API wallet, BUL total (with the BUL
+        // accounts inside), then the other balances (RUPE, unsettled, pending).
         <div className="flex flex-wrap gap-1.5 whitespace-nowrap min-[1680px]:gap-2.5">
-          <div className="flex-auto rounded-xl bg-brand-gradient px-3 py-2.5 min-[1680px]:px-4 text-white shadow-lg shadow-brand-primary/20">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/75">API wallet</p>
-            <p className="mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl tracking-tight min-[1680px]:text-2xl">{inr(balance.wallet)}</p>
-            <p className="text-xs text-white/70">Platform balance</p>
-          </div>
-
-          <div className="flex-auto rounded-xl border border-brand-border bg-white px-3 py-2.5 min-[1680px]:px-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">BUL total</p>
-            <p className="mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl text-text-primary">{inr(accountsTotal)}</p>
-            <p className="text-xs text-text-secondary">
-              {balance.accounts.length} account{balance.accounts.length === 1 ? "" : "s"}
-            </p>
-          </div>
-
           <div className="flex-auto rounded-xl border border-brand-border bg-white px-3 py-2.5 min-[1680px]:px-4">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Difference</p>
@@ -154,21 +161,46 @@ export function ApiBalanceView() {
                     "rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
                     diffMatches ? "bg-status-success-bg text-status-success" : "bg-status-failed-bg text-status-failed",
                   )}
-                  title={diffMatches ? "Matches wallet − BUL total" : "Doesn't match wallet − BUL total"}
+                  title={diffMatches ? "Matches wallet − all balances" : "Doesn't match wallet − all balances"}
                 >
                   {diffMatches ? "✓" : "≠"}
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl text-text-primary">
+            <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", "text-text-primary")}>
               {balance.diff != null ? inr(balance.diff) : "—"}
             </p>
-            <p className="text-xs text-text-secondary">Wallet − BUL total</p>
+            <p className="text-xs text-text-secondary">Wallet − balances</p>
           </div>
 
-          {balance.accounts.map((account) => {
-            const share = accountsTotal > 0 ? (account.amount / accountsTotal) * 100 : 0;
-            // Unsettled and pending money isn't in a BUL account yet, so it gets its own (amber) style.
+          <div className="flex-auto rounded-xl bg-brand-gradient px-3 py-2.5 text-white shadow-lg shadow-brand-primary/20 min-[1680px]:px-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/75">API wallet</p>
+            <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight min-[1680px]:text-2xl">{inr(balance.wallet)}</p>
+            <p className="text-xs text-white/70">Platform balance</p>
+          </div>
+
+          {bulAccounts.length > 0 && (
+            <div className="flex flex-auto flex-wrap gap-x-2.5 gap-y-2 rounded-xl border border-brand-border bg-white px-3 py-2.5 min-[1680px]:gap-x-4 min-[1680px]:px-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">BUL total</p>
+                <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", "text-text-primary")}>{inr(bulTotal)}</p>
+                <p className="text-xs text-text-secondary">
+                  {bulAccounts.length} account{bulAccounts.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              {bulAccounts.map((account) => (
+                <div key={account.key} className="flex-1 border-l border-brand-border pl-2.5 min-[1680px]:pl-4">
+                  <p className="font-mono text-xs font-semibold text-text-secondary">{account.label}</p>
+                  <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", "text-text-primary")}>{inr(account.amount)}</p>
+                  {/* Share of the BUL total. */}
+                  <ShareBar share={bulTotal > 0 ? (account.amount / bulTotal) * 100 : 0} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {otherAccounts.map((account) => {
+            // Unsettled and pending money isn't in an account yet, so it gets its own (amber) style.
             const held = isHeldBalance(account.key);
             return (
               <div
@@ -184,18 +216,8 @@ export function ApiBalanceView() {
                 <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", held ? "text-amber-900" : "text-text-primary")}>
                   {inr(account.amount)}
                 </p>
-                {/* Share of the BUL total beside the bar, so the label row doesn't widen the card. */}
-                <div className="mt-1 flex items-center gap-1.5">
-                  <div className={cn("h-1.5 min-w-8 flex-1 overflow-hidden rounded-full", held ? "bg-amber-100" : "bg-brand-light")} aria-hidden="true">
-                    <div
-                      className={cn("h-full rounded-full", held ? "bg-amber-500" : "bg-brand-gradient")}
-                      style={{ width: `${Math.min(100, share)}%` }}
-                    />
-                  </div>
-                  <p className={cn("text-[11px] tabular-nums", held ? "text-amber-700" : "text-text-secondary")}>
-                    {share.toFixed(1)}%
-                  </p>
-                </div>
+                {/* Share of all balances (BUL accounts and these). */}
+                <ShareBar share={accountsTotal > 0 ? (account.amount / accountsTotal) * 100 : 0} held={held} />
               </div>
             );
           })}

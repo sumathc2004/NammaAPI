@@ -24,75 +24,151 @@ async function loadSummary(): Promise<LoadState> {
 
 const inr = (amount: number) => amount.toLocaleString("en-IN", { style: "currency", currency: "INR" });
 
-/** Line icons (24×24, stroke) for the three cards. */
+const count = (n: number) => n.toLocaleString("en-IN");
+
+/** Line icons (24×24, stroke). */
 const ICONS = {
   // Arrows both ways: money sent out to beneficiaries.
   transfers: <path d="M7 7h13m0 0-4-4m4 4-4 4M17 17H4m0 0 4-4m-4 4 4 4" />,
   // Arrow into a tray: money collected through the payment gateway.
   pg: <path d="M12 3v11m0 0-4-4m4 4 4-4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />,
-  // Credit card.
   card: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <path d="M3 10h18M7 15h3" />
     </>
   ),
+  check: <path d="M5 12.5 10 17l9-10" />,
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  cross: <path d="M7 7l10 10M17 7 7 17" />,
+  sum: <path d="M18 5H6l6 7-6 7h12" />,
+  wallet: (
+    <>
+      <path d="M4 7a2 2 0 0 1 2-2h11v4" />
+      <rect x="4" y="9" width="16" height="11" rx="2" />
+      <path d="M16 14.5h.01" />
+    </>
+  ),
+};
+type IconName = keyof typeof ICONS;
+
+function Icon({ name, size = 16, className }: { name: IconName; size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      {ICONS[name]}
+    </svg>
+  );
+}
+
+const STAT_TONES = {
+  success: "bg-status-success-bg text-status-success",
+  waiting: "bg-amber-50 text-amber-700",
+  failed: "bg-status-failed-bg text-status-failed",
 };
 
-function SummaryIcon({ name }: { name: keyof typeof ICONS }) {
+function Stat({ icon, tone, value, label }: { icon: IconName; tone: keyof typeof STAT_TONES; value: number; label: string }) {
   return (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand-primary">
-      <svg
-        width="17"
-        height="17"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        {ICONS[name]}
-      </svg>
-    </span>
+    <div className="min-w-0 rounded-lg bg-brand-light/60 px-2.5 py-2">
+      <div className="flex items-center gap-1.5">
+        <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-md", STAT_TONES[tone])}>
+          <Icon name={icon} size={13} />
+        </span>
+        <p className="text-sm font-bold tabular-nums text-text-primary">{count(value)}</p>
+      </div>
+      <p className="mt-1 truncate text-[11px] text-text-secondary">{label}</p>
+    </div>
   );
 }
 
 function SummaryCard({
   title,
+  subtitle,
   icon,
   part,
   waitingLabel,
-  extra,
+  footer,
 }: {
   title: string;
-  icon: keyof typeof ICONS;
+  subtitle: string;
+  icon: IconName;
   part: DaySummaryPart;
   waitingLabel: string;
-  extra?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   const failed = Math.max(0, part.count - part.success - part.waiting);
+  const pct = (n: number) => (part.count > 0 ? (n / part.count) * 100 : 0);
+  const rate = pct(part.success);
   return (
-    <div className="rounded-xl border border-brand-border bg-white px-4 py-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <SummaryIcon name={icon} />
-          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">{title}</p>
+    <div className="flex flex-col rounded-xl border border-brand-border bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand-primary/20">
+            <Icon name={icon} size={19} />
+          </span>
+          <div>
+            <p className="text-sm font-bold text-text-primary">{title}</p>
+            <p className="text-xs text-text-secondary">{subtitle}</p>
+          </div>
         </div>
-        {part.waiting > 0 && (
-          <span className="rounded-full bg-status-pending-bg px-2 py-0.5 text-[11px] font-semibold text-status-pending">
-            {part.waiting} {waitingLabel}
+        {part.count > 0 && (
+          <span
+            className={cn(
+              "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
+              rate >= 90 ? "bg-status-success-bg text-status-success" : "bg-amber-50 text-amber-700",
+            )}
+            title="Success rate"
+          >
+            {Math.round(rate)}% success
           </span>
         )}
       </div>
-      <p className="mt-1.5 text-2xl font-bold tabular-nums text-text-primary">{inr(part.successAmount)}</p>
-      <p className="text-xs text-text-secondary">
-        <span className="font-semibold text-status-success">{part.success}</span> of {part.count} successful
-        {failed > 0 && <span className="text-status-failed"> · {failed} failed</span>}
-        <span> · {inr(part.amount)} total</span>
-      </p>
-      {extra}
+
+      <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Successful today</p>
+      <p className="text-2xl font-bold tabular-nums tracking-tight text-text-primary">{inr(part.successAmount)}</p>
+
+      {/* Success / waiting / failed share of today's count. */}
+      <div
+        className="mt-3 flex h-2 overflow-hidden rounded-full bg-brand-light"
+        role="img"
+        aria-label={`${part.success} successful, ${part.waiting} ${waitingLabel}, ${failed} failed of ${part.count}`}
+      >
+        <div className="bg-status-success" style={{ width: `${pct(part.success)}%` }} />
+        <div className="bg-amber-400" style={{ width: `${pct(part.waiting)}%` }} />
+        <div className="bg-status-failed" style={{ width: `${pct(failed)}%` }} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Stat icon="check" tone="success" value={part.success} label="Successful" />
+        <Stat icon="clock" tone="waiting" value={part.waiting} label={waitingLabel[0].toUpperCase() + waitingLabel.slice(1)} />
+        <Stat icon="cross" tone="failed" value={failed} label="Failed" />
+      </div>
+
+      <div className="mt-auto space-y-1.5 pt-3">
+        <div className="flex items-center justify-between gap-2 border-t border-brand-border pt-2.5 text-xs">
+          <span className="flex items-center gap-1.5 text-text-secondary">
+            <Icon name="sum" size={13} />
+            {count(part.count)} attempted
+          </span>
+          <span className="font-semibold tabular-nums text-text-primary">{inr(part.amount)}</span>
+        </div>
+        {footer}
+      </div>
     </div>
   );
 }
@@ -132,9 +208,9 @@ export function DaySummaryView() {
       </h2>
 
       {state.status === "loading" && (
-        <div className="grid gap-3 md:grid-cols-3" aria-busy="true" aria-label="Loading today's summary">
+        <div className="grid gap-3 xl:grid-cols-3" aria-busy="true" aria-label="Loading today's summary">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl border border-brand-border bg-white" />
+            <div key={i} className="h-56 animate-pulse rounded-xl border border-brand-border bg-white" />
           ))}
         </div>
       )}
@@ -146,26 +222,45 @@ export function DaySummaryView() {
       )}
 
       {state.status === "ready" && (
-        <div className="grid gap-3 md:grid-cols-3">
-          <SummaryCard title="Transfers" icon="transfers" part={state.summary.transfers} waitingLabel="in queue" />
+        <div className="grid gap-3 xl:grid-cols-3">
+          <SummaryCard
+            title="Transfers"
+            subtitle="Payouts to beneficiaries"
+            icon="transfers"
+            part={state.summary.transfers}
+            waitingLabel="in queue"
+          />
           <SummaryCard
             title="PG collections"
+            subtitle="Via payment gateway"
             icon="pg"
             part={state.summary.pg}
             waitingLabel="pending"
-            extra={
-              <p
-                className={cn(
-                  "mt-1 text-xs font-semibold",
-                  state.summary.pg.walletCredited === state.summary.pg.success ? "text-status-success" : "text-status-failed",
-                )}
-              >
-                {state.summary.pg.walletCredited === state.summary.pg.success ? "✓ " : ""}
-                {state.summary.pg.walletCredited} of {state.summary.pg.success} credited to wallets
-              </p>
+            footer={
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex items-center gap-1.5 text-text-secondary">
+                  <Icon name="wallet" size={13} />
+                  Credited to wallets
+                </span>
+                <span
+                  className={cn(
+                    "font-semibold tabular-nums",
+                    state.summary.pg.walletCredited === state.summary.pg.success ? "text-status-success" : "text-status-failed",
+                  )}
+                >
+                  {state.summary.pg.walletCredited === state.summary.pg.success ? "✓ " : ""}
+                  {count(state.summary.pg.walletCredited)} of {count(state.summary.pg.success)}
+                </span>
+              </div>
             }
           />
-          <SummaryCard title="Card payments" icon="card" part={state.summary.card} waitingLabel="pending" />
+          <SummaryCard
+            title="Card payments"
+            subtitle="Card collections"
+            icon="card"
+            part={state.summary.card}
+            waitingLabel="pending"
+          />
         </div>
       )}
     </section>
