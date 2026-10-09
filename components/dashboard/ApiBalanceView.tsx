@@ -28,6 +28,9 @@ const AUTO_REFRESH_MS = 30_000;
 const inr = (amount: number) => amount.toLocaleString("en-IN", { style: "currency", currency: "INR" });
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Unsettled / pending balances (the vendor spells one "pendnig"), shown apart from the BUL accounts. */
+const isHeldBalance = (key: string) => /unsettl|pend/i.test(key);
+
 function RefreshIcon({ spinning }: { spinning: boolean }) {
   return (
     <svg
@@ -125,63 +128,78 @@ export function ApiBalanceView() {
       )}
 
       {balance && (
-        <>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl bg-brand-gradient px-4 py-3 text-white shadow-lg shadow-brand-primary/20">
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/75">API wallet</p>
-              <p className="mt-0.5 text-3xl font-bold tabular-nums tracking-tight">{inr(balance.wallet)}</p>
-              <p className="text-xs text-white/70">Platform balance at the API level</p>
-            </div>
-
-            <div className="rounded-xl border border-brand-border bg-white px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">BUL total</p>
-              <p className="mt-0.5 text-2xl font-bold tabular-nums text-text-primary">{inr(accountsTotal)}</p>
-              <p className="text-xs text-text-secondary">
-                Across {balance.accounts.length} account{balance.accounts.length === 1 ? "" : "s"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-brand-border bg-white px-4 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Difference</p>
-                {balance.diff != null && (
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                      diffMatches ? "bg-status-success-bg text-status-success" : "bg-status-failed-bg text-status-failed",
-                    )}
-                  >
-                    {diffMatches ? "✓ Matches" : "Doesn't match"}
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 text-2xl font-bold tabular-nums text-text-primary">
-                {balance.diff != null ? inr(balance.diff) : "—"}
-              </p>
-              <p className="text-xs text-text-secondary">Wallet − BUL total</p>
-            </div>
+        // One row on wide screens: each card is as wide as its content and grows to fill the line;
+        // on narrower screens they wrap.
+        <div className="flex flex-wrap gap-1.5 whitespace-nowrap min-[1680px]:gap-2.5">
+          <div className="flex-auto rounded-xl bg-brand-gradient px-3 py-2.5 min-[1680px]:px-4 text-white shadow-lg shadow-brand-primary/20">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/75">API wallet</p>
+            <p className="mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl tracking-tight min-[1680px]:text-2xl">{inr(balance.wallet)}</p>
+            <p className="text-xs text-white/70">Platform balance</p>
           </div>
 
-          {balance.accounts.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-              {balance.accounts.map((account) => {
-                const share = accountsTotal > 0 ? (account.amount / accountsTotal) * 100 : 0;
-                return (
-                  <div key={account.key} className="rounded-xl border border-brand-border bg-white px-3.5 py-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-mono text-xs font-semibold text-text-secondary">{account.label}</p>
-                      <p className="text-xs tabular-nums text-text-secondary">{share.toFixed(1)}%</p>
-                    </div>
-                    <p className="mt-0.5 text-xl font-bold tabular-nums text-text-primary">{inr(account.amount)}</p>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-brand-light" aria-hidden="true">
-                      <div className="h-full rounded-full bg-brand-gradient" style={{ width: `${Math.min(100, share)}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="flex-auto rounded-xl border border-brand-border bg-white px-3 py-2.5 min-[1680px]:px-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">BUL total</p>
+            <p className="mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl text-text-primary">{inr(accountsTotal)}</p>
+            <p className="text-xs text-text-secondary">
+              {balance.accounts.length} account{balance.accounts.length === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          <div className="flex-auto rounded-xl border border-brand-border bg-white px-3 py-2.5 min-[1680px]:px-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Difference</p>
+              {balance.diff != null && (
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
+                    diffMatches ? "bg-status-success-bg text-status-success" : "bg-status-failed-bg text-status-failed",
+                  )}
+                  title={diffMatches ? "Matches wallet − BUL total" : "Doesn't match wallet − BUL total"}
+                >
+                  {diffMatches ? "✓" : "≠"}
+                </span>
+              )}
             </div>
-          )}
-        </>
+            <p className="mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl text-text-primary">
+              {balance.diff != null ? inr(balance.diff) : "—"}
+            </p>
+            <p className="text-xs text-text-secondary">Wallet − BUL total</p>
+          </div>
+
+          {balance.accounts.map((account) => {
+            const share = accountsTotal > 0 ? (account.amount / accountsTotal) * 100 : 0;
+            // Unsettled and pending money isn't in a BUL account yet, so it gets its own (amber) style.
+            const held = isHeldBalance(account.key);
+            return (
+              <div
+                key={account.key}
+                className={cn(
+                  "flex-auto rounded-xl border px-3 py-2.5 min-[1680px]:px-3.5",
+                  held ? "border-amber-200 bg-amber-50" : "border-brand-border bg-white",
+                )}
+              >
+                <p className={cn("font-mono text-xs font-semibold", held ? "text-amber-700" : "text-text-secondary")}>
+                  {account.label}
+                </p>
+                <p className={cn("mt-0.5 text-lg font-bold tabular-nums min-[1680px]:text-xl", held ? "text-amber-900" : "text-text-primary")}>
+                  {inr(account.amount)}
+                </p>
+                {/* Share of the BUL total beside the bar, so the label row doesn't widen the card. */}
+                <div className="mt-1 flex items-center gap-1.5">
+                  <div className={cn("h-1.5 min-w-8 flex-1 overflow-hidden rounded-full", held ? "bg-amber-100" : "bg-brand-light")} aria-hidden="true">
+                    <div
+                      className={cn("h-full rounded-full", held ? "bg-amber-500" : "bg-brand-gradient")}
+                      style={{ width: `${Math.min(100, share)}%` }}
+                    />
+                  </div>
+                  <p className={cn("text-[11px] tabular-nums", held ? "text-amber-700" : "text-text-secondary")}>
+                    {share.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </section>
   );
