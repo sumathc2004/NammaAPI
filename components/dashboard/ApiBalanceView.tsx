@@ -37,13 +37,13 @@ const isBulAccount = (key: string) => /^bul/i.test(key);
 function ShareBar({ share, held = false }: { share: number; held?: boolean }) {
   return (
     <div className="mt-1 flex items-center gap-1.5">
-      <div className={cn("h-1.5 min-w-8 flex-1 overflow-hidden rounded-full", held ? "bg-amber-100" : "bg-brand-light")} aria-hidden="true">
+      <div className={cn("h-1.5 min-w-8 flex-1 overflow-hidden rounded-full", held ? "bg-brand-navy/10" : "bg-brand-light")} aria-hidden="true">
         <div
-          className={cn("h-full rounded-full", held ? "bg-amber-500" : "bg-brand-gradient")}
+          className={cn("h-full rounded-full", held ? "bg-brand-navy" : "bg-brand-gradient")}
           style={{ width: `${Math.min(100, share)}%` }}
         />
       </div>
-      <p className={cn("text-[11px] tabular-nums", held ? "text-amber-700" : "text-text-secondary")}>{share.toFixed(1)}%</p>
+      <p className={cn("text-[11px] tabular-nums", held ? "text-brand-navy/70" : "text-text-secondary")}>{share.toFixed(1)}%</p>
     </div>
   );
 }
@@ -152,14 +152,14 @@ export function ApiBalanceView() {
         // on narrower screens they wrap. Order: Difference, API wallet, BUL total (with the BUL
         // accounts inside), then the other balances (RUPE, unsettled, pending).
         <div className="flex flex-wrap gap-1.5 whitespace-nowrap min-[1680px]:gap-2.5">
-          <div className="flex-auto rounded-xl border border-brand-border bg-white px-3 py-2 min-[1680px]:px-4">
+          <div className="flex-auto rounded-xl bg-brand-gradient px-3 py-2 text-white shadow-lg shadow-brand-primary/20 min-[1680px]:px-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Difference</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/75">Difference</p>
               {balance.diff != null && (
                 <span
                   className={cn(
                     "rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
-                    diffMatches ? "bg-status-success-bg text-status-success" : "bg-status-failed-bg text-status-failed",
+                    diffMatches ? "bg-white/20 text-white" : "bg-status-failed-bg text-status-failed",
                   )}
                   title={diffMatches ? "Matches wallet − all balances" : "Doesn't match wallet − all balances"}
                 >
@@ -167,16 +167,16 @@ export function ApiBalanceView() {
                 </span>
               )}
             </div>
-            <p className={cn("mt-0.5 text-base font-bold tabular-nums", "text-text-primary")}>
+            <p className="mt-0.5 text-lg font-bold leading-snug tabular-nums tracking-tight">
               {balance.diff != null ? inr(balance.diff) : "—"}
             </p>
-            <p className="text-[11px] text-text-secondary">Wallet − balances</p>
+            <p className="text-[11px] text-white/70">Wallet − balances</p>
           </div>
 
-          <div className="flex-auto rounded-xl bg-brand-gradient px-3 py-2 text-white shadow-lg shadow-brand-primary/20 min-[1680px]:px-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-white/75">API wallet</p>
-            <p className="mt-0.5 text-lg font-bold leading-snug tabular-nums tracking-tight">{inr(balance.wallet)}</p>
-            <p className="text-[11px] text-white/70">Platform balance</p>
+          <div className="flex-auto rounded-xl border border-brand-border bg-white px-3 py-2 min-[1680px]:px-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">API wallet</p>
+            <p className="mt-0.5 text-base font-bold tabular-nums text-text-primary">{inr(balance.wallet)}</p>
+            <p className="text-[11px] text-text-secondary">Platform balance</p>
           </div>
 
           {bulAccounts.length > 0 && (
@@ -200,20 +200,20 @@ export function ApiBalanceView() {
           )}
 
           {otherAccounts.map((account) => {
-            // Unsettled and pending money isn't in an account yet, so it gets its own (amber) style.
+            // Unsettled and pending money isn't in an account yet, so it gets its own (navy) style.
             const held = isHeldBalance(account.key);
             return (
               <div
                 key={account.key}
                 className={cn(
                   "flex-auto rounded-xl border px-3 py-2 min-[1680px]:px-3.5",
-                  held ? "border-amber-200 bg-amber-50" : "border-brand-border bg-white",
+                  held ? "border-brand-navy/15 bg-brand-navy/[0.06]" : "border-brand-border bg-white",
                 )}
               >
-                <p className={cn("font-mono text-[11px] font-semibold", held ? "text-amber-700" : "text-text-secondary")}>
+                <p className={cn("font-mono text-[11px] font-semibold", held ? "text-brand-navy/70" : "text-text-secondary")}>
                   {account.label}
                 </p>
-                <p className={cn("mt-0.5 text-base font-bold tabular-nums", held ? "text-amber-900" : "text-text-primary")}>
+                <p className={cn("mt-0.5 text-base font-bold tabular-nums", held ? "text-brand-navy" : "text-text-primary")}>
                   {inr(account.amount)}
                 </p>
                 {/* Share of all balances (BUL accounts and these). */}
