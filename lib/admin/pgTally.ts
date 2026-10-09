@@ -23,6 +23,11 @@ export type PgTallyRow = {
   walletCreditTime: string | null;
   /** Vendor says a status check (bpayStatusCheck_admin) can update this collection. */
   canRefresh: boolean;
+  /**
+   * Vendor's own "credited" flag (WalletCredited). Seen true on collections whose WalletCreditCount
+   * is still 0, so it counts as credited on its own. null when the vendor doesn't send it.
+   */
+  walletCredited: boolean | null;
 };
 
 /** One settlement payout from a status check. The account number is masked to its last 4 digits. */
@@ -54,12 +59,12 @@ export type TallyCheck = "ok" | "not-credited" | "double-credited" | "pending" |
 export function tallyCheck(row: PgTallyRow): TallyCheck {
   const status = row.status.toUpperCase();
   if (status === "SUCCESS") {
-    if (row.walletCreditCount === 0) return "not-credited";
     if (row.walletCreditCount > 1) return "double-credited";
-    return "ok";
+    if (row.walletCreditCount === 1 || row.walletCredited === true) return "ok";
+    return "not-credited";
   }
   // A collection that didn't succeed should never have been credited.
-  if (row.walletCreditCount > 0) return "wrongly-credited";
+  if (row.walletCreditCount > 0 || row.walletCredited === true) return "wrongly-credited";
   return status === "FAILED" ? "failed" : "pending";
 }
 
@@ -95,7 +100,8 @@ export function tallyTotals(rows: PgTallyRow[]): PgTallyTotals {
     } else if (status === "FAILED") totals.failed += 1;
     else totals.pending += 1;
     if (isTallyIssue(tallyCheck(row))) totals.issues += 1;
-    totals.credited += row.amount * row.walletCreditCount;
+    // A WalletCredited flag with no counted credit still means one credit.
+    totals.credited += row.amount * Math.max(row.walletCreditCount, row.walletCredited ? 1 : 0);
   }
   return totals;
 }

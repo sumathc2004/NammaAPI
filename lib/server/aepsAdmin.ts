@@ -78,6 +78,10 @@ export async function fetchPgTally(from: string, to: string): Promise<PgTallyRes
     walletCreditCount: toNumber(r.WalletCreditCount) ?? 0,
     walletCreditTime: text(r.WalletCreditTime) || null,
     canRefresh: r.CanRefresh === true || /^(true|1|yes)$/i.test(text(r.CanRefresh)),
+    walletCredited:
+      r.WalletCredited === undefined || r.WalletCredited === null
+        ? null
+        : r.WalletCredited === true || /^(true|1|yes)$/i.test(text(r.WalletCredited)),
   }));
   return { ok: true, rows };
 }
