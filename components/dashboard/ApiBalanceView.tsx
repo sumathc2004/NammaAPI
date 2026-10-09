@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ApiLevelBalance } from "@/lib/admin/apiBalance";
 import { cn } from "@/lib/cn";
 
@@ -21,6 +21,9 @@ async function loadBalance(): Promise<LoadState> {
     return { status: "error", message: "Network error. Check your connection and try again." };
   }
 }
+
+/** How often the balance quietly re-loads itself. */
+const AUTO_REFRESH_MS = 30_000;
 
 const inr = (amount: number) => amount.toLocaleString("en-IN", { style: "currency", currency: "INR" });
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -59,6 +62,21 @@ export function ApiBalanceView() {
     };
   }, [reloadKey]);
 
+  // Re-load every 30s without the loading skeleton. Skips while the browser tab is hidden or the
+  // first load/last reload failed, and a failed quiet reload keeps the numbers on screen.
+  const statusRef = useRef(state.status);
+  useEffect(() => {
+    statusRef.current = state.status;
+  });
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (document.hidden || statusRef.current !== "ready") return;
+      const next = await loadBalance();
+      if (next.status === "ready") setState(next);
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, []);
+
   function refresh() {
     setState({ status: "loading" });
     setReloadKey((k) => k + 1);
@@ -77,7 +95,7 @@ export function ApiBalanceView() {
           </h2>
           {state.status === "ready" && (
             <p className="text-xs text-text-secondary">
-              Updated {new Date(state.fetchedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+              Updated {new Date(state.fetchedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" })}
             </p>
           )}
         </div>
