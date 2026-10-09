@@ -103,8 +103,16 @@ export async function checkBpayStatus(referenceNumber: string, pgOrderId: string
   const body = (result.body && typeof result.body === "object" ? result.body : {}) as Record<string, unknown>;
   const records = Array.isArray(body.data) ? (body.data as Record<string, unknown>[]) : [];
   const record = records[0];
-  if (!/^true$/i.test(text(body.status)) || !record) {
-    const message = text(body.message) || text(body.Message);
+  // "true" has been seen as a string; accept a real boolean too.
+  const statusOk = body.status === true || /^true$/i.test(text(body.status));
+  if (!statusOk || !record) {
+    // Status, code and message only — never the payout account details.
+    console.warn(
+      `AEPS bpayStatusCheck_admin not ok: status=${JSON.stringify(body.status)} statusCode=${JSON.stringify(body.statusCode)} ` +
+        `message=${JSON.stringify(text(body.message) || text(body.Message))} records=${records.length} ` +
+        `recordStatus=${JSON.stringify(record?.status)} recordMessage=${JSON.stringify(record?.message)} keys=${Object.keys(body).join(",")}`,
+    );
+    const message = text(body.message) || text(body.Message) || text(record?.message);
     return { ok: false, error: message || (record ? "The status check failed." : "No record found for this reference.") };
   }
 
