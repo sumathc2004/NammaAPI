@@ -328,22 +328,22 @@ export function PgTallyView() {
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-brand-light/95 backdrop-blur">
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                    <th scope="col" className="whitespace-nowrap px-3 py-2.5">
+                    <th scope="col" className="whitespace-nowrap px-3 py-2">
                       Date &amp; Time
                     </th>
-                    <th scope="col" className="px-3 py-2.5">
+                    <th scope="col" className="px-3 py-2">
                       Retailer
                     </th>
-                    <th scope="col" className="hidden px-3 py-2.5 lg:table-cell">
-                      Reference
+                    <th scope="col" className="hidden px-3 py-2 lg:table-cell">
+                      Reference / Collection ID
                     </th>
-                    <th scope="col" className="px-3 py-2.5 text-right">
+                    <th scope="col" className="px-3 py-2 text-right">
                       Amount
                     </th>
-                    <th scope="col" className="px-3 py-2.5">
+                    <th scope="col" className="px-3 py-2">
                       Status
                     </th>
-                    <th scope="col" className="px-3 py-2.5">
+                    <th scope="col" className="px-3 py-2">
                       Wallet
                     </th>
                   </tr>
@@ -357,27 +357,32 @@ export function PgTallyView() {
                         key={row.collectionId || row.referenceNumber}
                         className={cn("transition-colors hover:bg-brand-light/40", issue && "bg-status-failed-bg/50 hover:bg-status-failed-bg/70")}
                       >
-                        <td className="whitespace-nowrap px-3 py-2.5">
+                        <td className="whitespace-nowrap px-3 py-2">
                           <span className="block text-text-primary">{date}</span>
                           <span className="block text-xs text-text-secondary">{time}</span>
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-2">
                           <span className="block font-medium text-text-primary">{row.vendorName}</span>
                           {row.userName && row.userName !== row.vendorName && (
                             <span className="block font-mono text-xs text-text-secondary">{row.userName}</span>
                           )}
                         </td>
-                        <td className="hidden whitespace-nowrap px-3 py-2.5 font-mono text-xs text-text-secondary lg:table-cell">
-                          {row.referenceNumber || row.collectionId}
+                        <td className="hidden whitespace-nowrap px-3 py-2 font-mono lg:table-cell">
+                          <span className="block text-xs text-text-primary">{row.referenceNumber || "—"}</span>
+                          {row.collectionId && row.collectionId !== row.referenceNumber && (
+                            <span className="block text-[11px] text-text-secondary">{row.collectionId}</span>
+                          )}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                           <span className="block font-semibold text-text-primary">{inr(row.amount)}</span>
-                          <span className="block text-xs text-text-secondary">{inr(row.debitFromCard)} charged</span>
+                          <span className="block text-xs text-text-secondary">
+                            {inr(row.debitFromCard)} − {inr(row.charges)} fee
+                          </span>
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-2">
                           <StatusBadge status={row.status} />
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-2">
                           <WalletBadge row={row} />
                         </td>
                       </tr>
@@ -405,13 +410,23 @@ export function PgTallyView() {
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <span className="text-base font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
+                        <span className="text-right">
+                          <span className="block text-base font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
+                          <span className="block text-[11px] tabular-nums text-text-secondary">
+                            {inr(row.debitFromCard)} − {inr(row.charges)} fee
+                          </span>
+                        </span>
                         <StatusBadge status={row.status} />
                       </div>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2 border-t border-brand-border/70 pt-2 text-xs">
                       <WalletBadge row={row} />
-                      <span className="truncate font-mono text-text-secondary">{row.referenceNumber || row.collectionId}</span>
+                      <span className="min-w-0 truncate text-right font-mono text-text-secondary">
+                        {row.referenceNumber || row.collectionId}
+                        {row.collectionId && row.collectionId !== row.referenceNumber && row.referenceNumber && (
+                          <span className="block text-[11px]">{row.collectionId}</span>
+                        )}
+                      </span>
                     </div>
                   </li>
                 );
