@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ApiLevelBalance } from "@/lib/admin/apiBalance";
-import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { cn } from "@/lib/cn";
 
 type LoadState =
@@ -88,24 +87,17 @@ export function ApiBalanceView() {
   const diffMatches = balance?.diff != null && round2(balance.wallet - accountsTotal) === round2(balance.diff);
 
   return (
-    <section aria-labelledby="api-balance-title" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand-primary/25 md:h-10 md:w-10">
-              <SectionIcon id="admin" className="h-5 w-5" />
-            </span>
-            <div>
-              <h1 id="api-balance-title" className="text-lg font-bold tracking-tight text-text-primary sm:text-2xl">
-                API Level Balance
-              </h1>
-              {state.status === "ready" && (
-                <p className="text-xs text-text-secondary">
-                  Updated {new Date(state.fetchedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" })}
-                </p>
-              )}
-            </div>
-          </div>
+    <section aria-labelledby="api-balance-title" className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-3">
+          <h1 id="api-balance-title" className="text-lg font-bold tracking-tight text-text-primary">
+            API Level Balance
+          </h1>
+          {state.status === "ready" && (
+            <p className="text-xs text-text-secondary">
+              Updated {new Date(state.fetchedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" })}
+            </p>
+          )}
         </div>
         <button
           type="button"

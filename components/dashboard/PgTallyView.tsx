@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { DatePicker } from "@/components/dashboard/DatePicker";
-import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { groupByRetailer, isTallyIssue, tallyCheck, tallyTotals, type PgTallyRow, type TallyCheck } from "@/lib/admin/pgTally";
 import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
@@ -146,20 +145,16 @@ export function PgTallyView() {
   const ready = state.status === "ready";
 
   return (
-    <section aria-labelledby="pg-tally-title" className="flex flex-col gap-3 md:gap-4">
-      {/* Title + date range, as in Transfer Reports */}
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand-primary/25 md:h-10 md:w-10">
-            <SectionIcon id="pg-reports" className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 id="pg-tally-title" className="text-lg font-bold tracking-tight text-text-primary sm:text-2xl">
-              PG Tally
-            </h2>
-            <p className="text-xs text-text-secondary">Card collections vs wallet credits</p>
-          </div>
-        </div>
+    <section aria-labelledby="pg-tally-title" className="flex flex-col gap-2">
+      {/* One compact line: title + date range */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <h2
+          id="pg-tally-title"
+          title="Card collections vs wallet credits"
+          className="text-lg font-bold tracking-tight text-text-primary"
+        >
+          PG Tally
+        </h2>
         <form onSubmit={handleSubmit} className="flex w-full items-center gap-1.5 md:w-auto">
           <DatePicker
             label="From"
