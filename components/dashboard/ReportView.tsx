@@ -726,6 +726,8 @@ export function ReportView({
   }
 
   const table = state.status === "ready" ? state.table : null;
+  // Compact panel showing a single day: the date is the same on every row, so show just the time.
+  const timeOnly = compact && range.from === range.to;
   const layout = columnLayout ? columnLayouts[columnLayout] : reportLayouts[section];
   const columns = useMemo(
     () => (table ? ((layout && layoutColumns(table, layout)) ?? describeColumns(table)) : []),
@@ -1045,11 +1047,12 @@ export function ReportView({
                       scope="col"
                       className={cn(
                         "whitespace-nowrap px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary",
+                        compact && "px-2",
                         column.kind === "amount" && "text-right",
                         column.hideBelow && HIDE_BELOW[column.hideBelow],
                       )}
                     >
-                      {columnTitle(column)}
+                      {timeOnly && column.kind === "date" ? "Time" : columnTitle(column)}
                     </th>
                   ))}
                 </tr>
@@ -1062,6 +1065,7 @@ export function ReportView({
                         key={column.key}
                         className={cn(
                           "px-3 py-2.5 align-middle text-text-primary",
+                          compact && "px-2",
                           column.kind === "amount" && "whitespace-nowrap text-right",
                           (column.kind === "status" || column.kind === "entryType") && "whitespace-nowrap",
                           column.hideBelow && HIDE_BELOW[column.hideBelow],
@@ -1101,6 +1105,10 @@ export function ReportView({
                               </>
                             )}
                           </div>
+                        ) : timeOnly && column.kind === "date" ? (
+                          <span className="whitespace-nowrap tabular-nums text-text-primary">
+                            {dateCellText(column, row).split(", ")[1] ?? dateCellText(column, row)}
+                          </span>
                         ) : (
                           <Cell column={column} row={row} variant="table" />
                         )}

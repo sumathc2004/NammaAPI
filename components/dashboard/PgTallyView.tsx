@@ -330,6 +330,8 @@ export function PgTallyView() {
   }, [retailerRows, view, query]);
   const totals = tallyTotals(retailerRows);
   const ready = state.status === "ready";
+  // One day selected: every row has the same date, so the table shows just the time.
+  const timeOnly = range.from === range.to;
 
   return (
     <section aria-labelledby="pg-tally-title" className="@container flex flex-col gap-2">
@@ -511,7 +513,7 @@ export function PgTallyView() {
                 <thead className="sticky top-0 z-10 bg-brand-light/95 backdrop-blur">
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                     <th scope="col" className="whitespace-nowrap px-2 py-2 @5xl:px-3">
-                      Date &amp; Time
+                      {timeOnly ? "Time" : "Date & Time"}
                     </th>
                     <th scope="col" className="px-2 py-2 @5xl:px-3">
                       Retailer
@@ -540,8 +542,14 @@ export function PgTallyView() {
                         className={cn("transition-colors hover:bg-brand-light/40", issue && "bg-status-failed-bg/50 hover:bg-status-failed-bg/70")}
                       >
                         <td className="whitespace-nowrap px-2 py-2 @5xl:px-3">
-                          <span className="block text-text-primary">{date}</span>
-                          <span className="block text-xs text-text-secondary">{time}</span>
+                          {timeOnly ? (
+                            <span className="block text-text-primary">{time}</span>
+                          ) : (
+                            <>
+                              <span className="block text-text-primary">{date}</span>
+                              <span className="block text-xs text-text-secondary">{time}</span>
+                            </>
+                          )}
                         </td>
                         <td className="px-2 py-2 @5xl:px-3">
                           <span className="block font-medium text-text-primary">{row.vendorName}</span>
