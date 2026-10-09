@@ -25,8 +25,28 @@ export type PgTallyRow = {
   canRefresh: boolean;
 };
 
-/** Result of an admin status check, shown in the popup: the vendor's message plus its plain fields. */
-export type BpayStatusCheck = { message: string; fields: { label: string; value: string }[] };
+/** One settlement payout from a status check. The account number is masked to its last 4 digits. */
+export type BpayPayout = {
+  beneficiaryName: string;
+  account: string;
+  ifsc: string;
+  mode: string;
+  status: string;
+  message: string;
+  utr: string;
+};
+
+/** Result of an admin status check (vendor bpayStatusCheck_admin → data[0]), shown in the popup. */
+export type BpayStatusCheck = {
+  status: string;
+  message: string;
+  collectionId: string;
+  utr: string;
+  charge: number | null;
+  gst: number | null;
+  additionalCharge: number | null;
+  payouts: BpayPayout[];
+};
 
 /** Whether a collection's wallet credit adds up. */
 export type TallyCheck = "ok" | "not-credited" | "double-credited" | "pending" | "failed" | "wrongly-credited";

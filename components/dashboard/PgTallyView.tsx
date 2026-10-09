@@ -115,6 +115,60 @@ type CheckResult =
   | { status: "ok"; reference: string; check: BpayStatusCheck }
   | { status: "error"; reference: string; error: string };
 
+function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="shrink-0 text-text-secondary">{label}</dt>
+      <dd className={cn("min-w-0 truncate text-right font-medium text-text-primary", mono && "font-mono")}>{value}</dd>
+    </div>
+  );
+}
+
+/** The vendor's answer for one collection: status, fees breakdown and each settlement payout. */
+function CheckDetails({ check }: { check: BpayStatusCheck }) {
+  const fees = [check.charge, check.gst, check.additionalCharge];
+  const feeTotal = fees.every((f) => f === null) ? null : fees.reduce<number>((sum, f) => sum + (f ?? 0), 0);
+  return (
+    <div className="mt-3 space-y-3 text-xs">
+      <div className="flex items-center gap-2">
+        {check.status && <StatusBadge status={check.status} />}
+        {check.message && <span className="text-sm text-text-primary">{check.message}</span>}
+      </div>
+      <dl className="space-y-1.5 rounded-lg bg-brand-light/50 px-3 py-2.5">
+        {check.collectionId && <DetailRow label="Collection ID" value={check.collectionId} mono />}
+        {check.utr && <DetailRow label="UTR" value={check.utr} mono />}
+        {feeTotal !== null && (
+          <>
+            <DetailRow label="Fees" value={inr(feeTotal)} />
+            <p className="text-right text-[11px] text-text-secondary">
+              {inr(check.charge ?? 0)} charge + {inr(check.gst ?? 0)} GST + {inr(check.additionalCharge ?? 0)} additional
+            </p>
+          </>
+        )}
+      </dl>
+      {check.payouts.map((payout, i) => (
+        <div key={i} className="rounded-lg border border-brand-border px-3 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+              Payout{check.payouts.length > 1 ? ` ${i + 1}` : ""}
+            </span>
+            {payout.status && <StatusBadge status={payout.status} />}
+          </div>
+          <dl className="space-y-1.5">
+            {payout.beneficiaryName && <DetailRow label="Beneficiary" value={payout.beneficiaryName} />}
+            {(payout.account || payout.ifsc) && (
+              <DetailRow label="Account" value={[payout.account, payout.ifsc].filter(Boolean).join(" · ")} mono />
+            )}
+            {payout.mode && <DetailRow label="Mode" value={payout.mode} />}
+            {payout.utr && <DetailRow label="UTR" value={payout.utr} mono />}
+            {payout.message && <DetailRow label="Message" value={payout.message} />}
+          </dl>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** "Checking…" while the vendor's status check runs, then its message and fields. Native <dialog>. */
 function CheckResultDialog({ result, onClose }: { result: CheckResult; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -152,23 +206,11 @@ function CheckResultDialog({ result, onClose }: { result: CheckResult; onClose: 
         </button>
       </div>
       <p className="mt-1 font-mono text-xs text-text-secondary">{result.reference}</p>
-      <p className={cn("mt-3 text-sm", result.status === "error" ? "text-red-600" : "text-text-primary")}>
-        {result.status === "pending"
-          ? "Asking the payments service for the latest status…"
-          : result.status === "ok"
-            ? result.check.message
-            : result.error}
-      </p>
-      {result.status === "ok" && result.check.fields.length > 0 && (
-        <dl className="mt-3 space-y-1.5 rounded-lg bg-brand-light/50 px-3 py-2.5 text-xs">
-          {result.check.fields.map((field) => (
-            <div key={field.label} className="flex items-baseline justify-between gap-4">
-              <dt className="text-text-secondary">{field.label}</dt>
-              <dd className="min-w-0 truncate text-right font-medium text-text-primary">{field.value}</dd>
-            </div>
-          ))}
-        </dl>
+      {result.status === "pending" && (
+        <p className="mt-3 text-sm text-text-primary">Asking the payments service for the latest status…</p>
       )}
+      {result.status === "error" && <p className="mt-3 text-sm text-red-600">{result.error}</p>}
+      {result.status === "ok" && <CheckDetails check={result.check} />}
       {result.status !== "pending" && (
         <button
           type="button"
