@@ -67,18 +67,17 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={cn(badge, STATUS_STYLES[status.toUpperCase()] ?? "bg-brand-light text-text-secondary")}>{status}</span>;
 }
 
-/** Wallet badge, with the credit time underneath once credited (and the date, if a different day). */
+/** Wallet badge, with the credit date and time underneath once credited. */
 function WalletBadge({ row }: { row: PgTallyRow }) {
   const wallet = WALLET[tallyCheck(row)];
   if (!wallet) return <span className="text-text-secondary">—</span>;
   const credited = row.walletCreditCount > 0 && row.walletCreditTime ? dateParts(row.walletCreditTime) : null;
-  const sameDay = credited !== null && credited.date === dateParts(row.createdDateTime).date;
   return (
     <span className="inline-flex flex-col items-start gap-0.5">
       <span className={cn(badge, wallet.className)}>{wallet.text}</span>
       {credited && (
         <span className="whitespace-nowrap pl-1 text-[11px] text-text-secondary" title="Credited to the wallet at">
-          {sameDay ? credited.time : `${credited.date}, ${credited.time}`}
+          {credited.date}, {credited.time}
         </span>
       )}
     </span>
