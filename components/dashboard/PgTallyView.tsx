@@ -77,18 +77,20 @@ function WalletBadge({ row }: { row: PgTallyRow }) {
       <span className={cn(badge, wallet.className)}>{wallet.text}</span>
       {credited && (
         <span className="whitespace-nowrap pl-1 text-[11px] text-text-secondary" title="Credited to the wallet at">
-          {credited.date}, {credited.time}
+          <span className="hidden @5xl:inline">{credited.date}</span>
+          <span className="@5xl:hidden">{credited.day}</span>, {credited.time}
         </span>
       )}
     </span>
   );
 }
 
-function dateParts(iso: string): { date: string; time: string } {
+function dateParts(iso: string): { date: string; day: string; time: string } {
   const value = new Date(iso);
-  if (Number.isNaN(value.getTime())) return { date: iso, time: "" };
+  if (Number.isNaN(value.getTime())) return { date: iso, day: iso, time: "" };
   return {
     date: value.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    day: value.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
     time: value.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }),
   };
 }
@@ -330,9 +332,9 @@ export function PgTallyView() {
   const ready = state.status === "ready";
 
   return (
-    <section aria-labelledby="pg-tally-title" className="flex flex-col gap-2">
+    <section aria-labelledby="pg-tally-title" className="@container flex flex-col gap-2">
       {/* One compact line: title + date range */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 @2xl:flex-row @2xl:items-center @2xl:justify-between">
         <h2
           id="pg-tally-title"
           title="Card collections vs wallet credits"
@@ -340,16 +342,16 @@ export function PgTallyView() {
         >
           PG Tally
         </h2>
-        <form onSubmit={handleSubmit} className="flex w-full items-center gap-1.5 md:w-auto">
+        <form onSubmit={handleSubmit} className="flex w-full items-center gap-1.5 @2xl:w-auto">
           <DatePicker
             label="From"
             value={draft.from}
             min={reportStartDate("pg-reports")}
             max={draft.to}
             onChange={(from) => setDraft((d) => ({ ...d, from }))}
-            className="min-w-0 flex-1 md:w-52 md:flex-none"
+            className="min-w-0 flex-1 @lg:w-52 @lg:flex-none"
           />
-          <span aria-hidden="true" className="hidden text-text-secondary md:inline">
+          <span aria-hidden="true" className="hidden text-text-secondary @lg:inline">
             →
           </span>
           <DatePicker
@@ -359,12 +361,12 @@ export function PgTallyView() {
             max={today}
             align="right"
             onChange={(to) => setDraft((d) => ({ ...d, to }))}
-            className="min-w-0 flex-1 md:w-52 md:flex-none"
+            className="min-w-0 flex-1 @lg:w-52 @lg:flex-none"
           />
           <button
             type="submit"
             disabled={state.status === "loading"}
-            className="h-9 shrink-0 rounded-lg bg-brand-gradient px-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60 md:px-4"
+            className="h-9 shrink-0 rounded-lg bg-brand-gradient px-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60 @lg:px-4"
           >
             Apply
           </button>
@@ -376,13 +378,13 @@ export function PgTallyView() {
         </p>
       )}
 
-      <div className="md:overflow-hidden md:rounded-2xl md:border md:border-brand-border md:bg-white md:shadow-sm">
+      <div className="@lg:overflow-hidden @lg:rounded-2xl @lg:border @lg:border-brand-border @lg:bg-white @lg:shadow-sm">
         {/* Toolbar: tabs, retailer, search, totals */}
-        <div className="flex flex-wrap items-center gap-2 md:border-b md:border-brand-border md:px-3 md:py-2.5 xl:flex-nowrap">
+        <div className="flex flex-wrap items-center gap-2 @lg:border-b @lg:border-brand-border @lg:px-3 @lg:py-2.5 @6xl:flex-nowrap">
           <div
             role="group"
             aria-label="Show"
-            className="flex h-9 w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-brand-border bg-white p-0.5 lg:w-auto lg:shrink-0"
+            className="flex h-9 w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-brand-border bg-white p-0.5 @5xl:w-auto @5xl:shrink-0"
           >
             {VIEWS.map((v) => {
               const active = v.id === viewId;
@@ -395,7 +397,7 @@ export function PgTallyView() {
                   aria-pressed={active}
                   onClick={() => setViewId(v.id)}
                   className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-colors lg:flex-none",
+                    "flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-colors @5xl:flex-none",
                     active ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
                   )}
                 >
@@ -423,7 +425,7 @@ export function PgTallyView() {
             value={retailer}
             onChange={(e) => setRetailer(e.target.value)}
             disabled={!ready || rows.length === 0}
-            className={cn(inputClasses, "min-w-0 flex-1 pr-8 md:w-44 md:flex-none xl:shrink-0")}
+            className={cn(inputClasses, "min-w-0 flex-1 pr-8 @5xl:w-44 @5xl:flex-none @6xl:shrink-0")}
           >
             <option value="">All retailers ({rows.length})</option>
             {retailers.map((g) => (
@@ -433,7 +435,7 @@ export function PgTallyView() {
             ))}
           </select>
 
-          <div className="relative min-w-0 flex-1 md:w-44 md:flex-none xl:w-auto xl:min-w-32 xl:flex-1">
+          <div className="relative min-w-0 flex-1 @5xl:w-44 @5xl:flex-none @6xl:w-auto @6xl:min-w-32 @6xl:flex-1">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"
@@ -463,7 +465,7 @@ export function PgTallyView() {
           {ready && rows.length > 0 && (
             <dl
               title="Totals for the selected dates and retailer"
-              className="flex h-9 min-w-0 shrink-0 items-center divide-x divide-brand-border rounded-lg border border-brand-border bg-white text-xs md:ml-auto"
+              className="flex h-9 w-full min-w-0 shrink-0 items-center divide-x divide-brand-border rounded-lg border border-brand-border bg-white text-xs @5xl:ml-auto @5xl:w-auto"
             >
               <div className="flex min-w-0 items-baseline gap-1.5 px-2.5">
                 <dt className="text-text-secondary">Collected</dt>
@@ -504,26 +506,26 @@ export function PgTallyView() {
         {ready && visible.length > 0 && (
           <>
             {/* Tablet and up: table */}
-            <div className="scrollbar-light hidden max-h-[34rem] overflow-auto md:block">
+            <div className="scrollbar-light hidden max-h-[28rem] overflow-auto @lg:block @5xl:max-h-[34rem]">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-brand-light/95 backdrop-blur">
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                    <th scope="col" className="whitespace-nowrap px-3 py-2">
+                    <th scope="col" className="whitespace-nowrap px-2 py-2 @5xl:px-3">
                       Date &amp; Time
                     </th>
-                    <th scope="col" className="px-3 py-2">
+                    <th scope="col" className="px-2 py-2 @5xl:px-3">
                       Retailer
                     </th>
-                    <th scope="col" className="hidden px-3 py-2 lg:table-cell">
+                    <th scope="col" className="hidden px-2 py-2 @5xl:px-3 @5xl:table-cell">
                       Reference / Collection ID
                     </th>
-                    <th scope="col" className="px-3 py-2 text-right">
+                    <th scope="col" className="px-2 py-2 @5xl:px-3 text-right">
                       Amount
                     </th>
-                    <th scope="col" className="px-3 py-2">
+                    <th scope="col" className="px-2 py-2 @5xl:px-3">
                       Status
                     </th>
-                    <th scope="col" className="px-3 py-2">
+                    <th scope="col" className="px-2 py-2 @5xl:px-3">
                       Wallet
                     </th>
                   </tr>
@@ -537,32 +539,33 @@ export function PgTallyView() {
                         key={row.collectionId || row.referenceNumber}
                         className={cn("transition-colors hover:bg-brand-light/40", issue && "bg-status-failed-bg/50 hover:bg-status-failed-bg/70")}
                       >
-                        <td className="whitespace-nowrap px-3 py-2">
+                        <td className="whitespace-nowrap px-2 py-2 @5xl:px-3">
                           <span className="block text-text-primary">{date}</span>
                           <span className="block text-xs text-text-secondary">{time}</span>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-2 @5xl:px-3">
                           <span className="block font-medium text-text-primary">{row.vendorName}</span>
                           {row.userName && row.userName !== row.vendorName && (
                             <span className="block font-mono text-xs text-text-secondary">{row.userName}</span>
                           )}
                         </td>
-                        <td className="hidden whitespace-nowrap px-3 py-2 font-mono lg:table-cell">
+                        <td className="hidden whitespace-nowrap px-2 py-2 @5xl:px-3 font-mono @5xl:table-cell">
                           <span className="block text-xs text-text-primary">{row.referenceNumber || "—"}</span>
                           {row.collectionId && row.collectionId !== row.referenceNumber && (
                             <span className="block text-[11px] text-text-secondary">{row.collectionId}</span>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                        <td className="whitespace-nowrap px-2 py-2 @5xl:px-3 text-right tabular-nums">
                           <span className="block font-semibold text-text-primary">{inr(row.amount)}</span>
                           <span className="block text-xs text-text-secondary">
-                            {inr(row.debitFromCard)} − {inr(row.charges)} fee
+                            <span className="hidden @5xl:inline">{inr(row.debitFromCard)} − </span>
+                            {inr(row.charges)} fee
                           </span>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-2 @5xl:px-3">
                           <StatusBadge status={row.status} />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-2 @5xl:px-3">
 <span className="flex items-center gap-2">
                             {!(row.canRefresh && !WALLET[tallyCheck(row)]) && <WalletBadge row={row} />}
                             {row.canRefresh && row.referenceNumber && row.collectionId && (
@@ -578,7 +581,7 @@ export function PgTallyView() {
             </div>
 
             {/* Phones: one card per collection */}
-            <ul className="space-y-2.5 pt-3 md:hidden" aria-label="PG tally entries">
+            <ul className="space-y-2.5 pt-3 @lg:hidden" aria-label="PG tally entries">
               {visible.map((row) => {
                 const { date, time } = dateParts(row.createdDateTime);
                 const issue = isTallyIssue(tallyCheck(row));

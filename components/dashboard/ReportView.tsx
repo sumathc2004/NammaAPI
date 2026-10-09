@@ -544,7 +544,19 @@ function TransferActionButton({
 }
 
 /** Date-range report screen used by dashboard sections backed by a vendor report endpoint. */
-export function ReportView({ section }: { section: DashboardSectionId }) {
+/**
+ * `compact`: for a half-width panel (admin page) — small title, date row stacked under it, and the
+ * view fills its parent's height. `columnLabels` keeps only those columns (by label), always shown.
+ */
+export function ReportView({
+  section,
+  compact = false,
+  columnLabels,
+}: {
+  section: DashboardSectionId;
+  compact?: boolean;
+  columnLabels?: readonly string[];
+}) {
   const router = useRouter();
   const { label } = getDashboardSection(section);
   const today = toIsoDate(new Date());
@@ -707,10 +719,11 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
   const table = state.status === "ready" ? state.table : null;
   const layout = reportLayouts[section];
-  const columns = useMemo(
-    () => (table ? ((layout && layoutColumns(table, layout)) ?? describeColumns(table)) : []),
-    [table, layout],
-  );
+  const columns = useMemo(() => {
+    const all = table ? ((layout && layoutColumns(table, layout)) ?? describeColumns(table)) : [];
+    if (!columnLabels) return all;
+    return all.filter((c) => columnLabels.includes(c.label)).map((c) => ({ ...c, hideBelow: undefined }));
+  }, [table, layout, columnLabels]);
 
   // Rows of the selected tab (e.g. Transfer's All / Queue / Refundable), then the search on top.
   const viewRows = useMemo(() => {
@@ -793,18 +806,22 @@ export function ReportView({ section }: { section: DashboardSectionId }) {
 
   return (
     // Fills the dashboard content area; on tablet and up only the table rows scroll.
-    <div className="flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
+    <div className={cn("flex min-h-0 flex-col", compact ? "h-full gap-2" : "flex-1 gap-3 md:gap-4")}>
       {/* Title + date range */}
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand-primary/25 md:h-10 md:w-10">
-            <SectionIcon id={section} className="h-5 w-5" />
-          </span>
-          <h1 className="text-lg font-bold tracking-tight text-text-primary sm:text-2xl">{label}</h1>
-        </div>
+      <div className={cn("flex flex-col", compact ? "gap-2" : "gap-3 xl:flex-row xl:items-center xl:justify-between")}>
+        {compact ? (
+          <h2 className="text-lg font-bold tracking-tight text-text-primary">{label}</h2>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand-primary/25 md:h-10 md:w-10">
+              <SectionIcon id={section} className="h-5 w-5" />
+            </span>
+            <h1 className="text-lg font-bold tracking-tight text-text-primary sm:text-2xl">{label}</h1>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <form onSubmit={handleSubmit} className="flex w-full items-center gap-1.5 md:w-auto">
+          <form onSubmit={handleSubmit} className={cn("flex w-full items-center gap-1.5", !compact && "md:w-auto")}>
             {/* Nothing before the section's start date can be picked; the server enforces the same limit. */}
             <DatePicker
               label="From"
