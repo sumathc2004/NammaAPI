@@ -699,6 +699,19 @@ export function ReportView({
     return () => clearInterval(interval);
   }, [section, range, compact]);
 
+  // Refund moves money, so it asks for confirmation first; the other actions run straight away.
+  const [confirmRefund, setConfirmRefund] = useState<{ uniqueTxnId: string; id: string; row: ReportRow } | null>(null);
+  function requestTransferAction(action: TransferAction, uniqueTxnId: string, id: string) {
+    if (action === "refund") {
+      const row = table?.rows.find((r) => r.UniqueTxnId === uniqueTxnId);
+      if (row) {
+        setConfirmRefund({ uniqueTxnId, id, row });
+        return;
+      }
+    }
+    runTransferAction(action, uniqueTxnId, id);
+  }
+
   async function runTransferAction(action: TransferAction, uniqueTxnId: string, id: string) {
     if (pendingAction) return;
     setPendingAction({ uniqueTxnId, action });
@@ -1038,7 +1051,7 @@ export function ReportView({
                 refreshingTxnId={refreshingTxnId}
                 onRefresh={refreshRow}
                 pendingAction={pendingAction}
-                onAction={runTransferAction}
+                onAction={requestTransferAction}
                 timeOnly={timeOnly}
               />
             ))}
@@ -1122,7 +1135,7 @@ export function ReportView({
                                 <TransferActionButton
                                   action="refund"
                                   pending={pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === "refund"}
-                                  onClick={() => runTransferAction("refund", row.UniqueTxnId, transferRowId(row)!)}
+                                  onClick={() => requestTransferAction("refund", row.UniqueTxnId, transferRowId(row)!)}
                                 />
                               </>
                             )}
@@ -1147,6 +1160,17 @@ export function ReportView({
 
       {refreshResult && <RefreshResultDialog result={refreshResult} onClose={() => setRefreshResult(null)} />}
       {actionResult && <TransferActionResultDialog result={actionResult} onClose={() => setActionResult(null)} />}
+      {confirmRefund && (
+        <ConfirmRefundDialog
+          row={confirmRefund.row}
+          onCancel={() => setConfirmRefund(null)}
+          onConfirm={() => {
+            const { uniqueTxnId, id } = confirmRefund;
+            setConfirmRefund(null);
+            runTransferAction("refund", uniqueTxnId, id);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1155,6 +1179,60 @@ type TransferActionResult =
   | { action: TransferAction; status: "pending"; id: string }
   | { action: TransferAction; status: "ok"; message: string; id: string; refreshAt?: number }
   | { action: TransferAction; status: "error"; error: string; id: string };
+
+/** "Refund ₹X to NAME?" — a deliberate second click before any refund is sent. Native <dialog>. */
+function ConfirmRefundDialog({ row, onCancel, onConfirm }: { row: ReportRow; onCancel: () => void; onConfirm: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  const name = (row.BeneficiaryName ?? "").trim() || "this beneficiary";
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={(e) => {
+        e.preventDefault();
+        onCancel();
+      }}
+      onClick={(e) => {
+        if (e.target === dialogRef.current) onCancel();
+      }}
+      aria-labelledby="confirm-refund-title"
+      className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
+    >
+      <h2 id="confirm-refund-title" className="text-base font-semibold text-text-primary">
+        Refund this transfer?
+      </h2>
+      <p className="mt-3 text-sm text-text-secondary">
+        <span className="text-2xl font-bold tabular-nums text-text-primary">{formatAmount(row.Amount ?? "0")}</span>
+        <span className="mt-1 block">
+          to <span className="font-semibold text-text-primary">{name}</span>
+        </span>
+      </p>
+      <p className="mt-3 text-xs text-text-secondary">
+        This sends the money back and can&apos;t be undone. To retry the transfer instead, choose Enqueue.
+      </p>
+      <div className="mt-5 flex gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="h-10 flex-1 rounded-lg border border-brand-border bg-white text-sm font-semibold text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="h-10 flex-1 rounded-lg bg-status-failed text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+        >
+          Refund
+        </button>
+      </div>
+    </dialog>
+  );
+}
 
 const TRANSFER_ACTION_RESULT_TITLES: Record<TransferAction, { ok: string; error: string }> = {
   dequeue: { ok: "Removed From Queue", error: "Dequeue Failed" },
