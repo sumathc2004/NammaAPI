@@ -1,7 +1,7 @@
 import "server-only";
 import { aepsRequest, AEPS_UNEXPECTED_ERROR } from "@/lib/server/aepsClient";
 import { accountLabel, type ApiLevelBalance } from "@/lib/admin/apiBalance";
-import type { PgTallyRow } from "@/lib/admin/pgTally";
+import type { BpayStatusCheck, PgTallyRow } from "@/lib/admin/pgTally";
 import type { SessionCredentials } from "@/lib/server/session";
 
 export type ApiBalanceResult = { ok: true; balance: ApiLevelBalance } | { ok: false; error: string };
@@ -77,6 +77,53 @@ export async function fetchPgTally(from: string, to: string): Promise<PgTallyRes
     status: text(r.PaymentStatus) || text(r.collectionStatus) || "PENDING",
     walletCreditCount: toNumber(r.WalletCreditCount) ?? 0,
     walletCreditTime: text(r.WalletCreditTime) || null,
+    canRefresh: r.CanRefresh === true || /^(true|1|yes)$/i.test(text(r.CanRefresh)),
   }));
   return { ok: true, rows };
+}
+
+export type BpayStatusResult = { ok: true; check: BpayStatusCheck } | { ok: false; error: string };
+
+/** "WalletCreditTime" -> "Wallet Credit Time" */
+const fieldLabel = (key: string) =>
+  key
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
+
+/**
+ * Admin-only: `bpayStatusCheck_admin?referenceNumber=` — asks the vendor to re-check one card
+ * collection (the vendor's CanRefresh flag says when that's useful). GET as given by the vendor;
+ * retried as POST if GET is refused (405), like the vendor's other action endpoints. The response
+ * shape isn't documented yet, so the vendor's message and every plain field are passed through.
+ */
+export async function checkBpayStatus(referenceNumber: string): Promise<BpayStatusResult> {
+  const params = { referenceNumber };
+  let result = await aepsRequest("bpayStatusCheck_admin", params, { prefer: "json" });
+  if (!result.ok && result.status === 405) {
+    result = await aepsRequest("bpayStatusCheck_admin", params, { method: "POST", prefer: "json" });
+  }
+  if (!result.ok) return result;
+
+  const body = result.body;
+  if (typeof body === "string") return { ok: true, check: { message: body.trim(), fields: [] } };
+  if (!body || typeof body !== "object") return { ok: true, check: { message: "Status check sent.", fields: [] } };
+
+  // Plain fields from the top level and one nested object (e.g. Data), in the vendor's order.
+  const record = body as Record<string, unknown>;
+  const nested = Object.values(record).find((v) => v && typeof v === "object" && !Array.isArray(v)) as
+    | Record<string, unknown>
+    | undefined;
+  const entries = [...Object.entries(record), ...Object.entries(nested ?? {})].filter(
+    ([, v]) => v !== null && v !== "" && (typeof v === "string" || typeof v === "number" || typeof v === "boolean"),
+  );
+  // Field names only (no values): the shape isn't documented, so this helps adjust the display.
+  console.info(`AEPS bpayStatusCheck_admin fields: ${entries.map(([k]) => k).join(", ")}`);
+
+  const messageEntry = entries.find(([k]) => /^(message|msg|remarks?|description)$/i.test(k));
+  const fields = entries
+    .filter((entry) => entry !== messageEntry)
+    .slice(0, 10)
+    .map(([k, v]) => ({ label: fieldLabel(k), value: String(v) }));
+  return { ok: true, check: { message: messageEntry ? String(messageEntry[1]) : "Status check done.", fields } };
 }

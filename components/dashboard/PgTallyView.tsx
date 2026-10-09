@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { DatePicker } from "@/components/dashboard/DatePicker";
-import { groupByRetailer, isTallyIssue, tallyCheck, tallyTotals, type PgTallyRow, type TallyCheck } from "@/lib/admin/pgTally";
+import {
+  groupByRetailer,
+  isTallyIssue,
+  tallyCheck,
+  tallyTotals,
+  type BpayStatusCheck,
+  type PgTallyRow,
+  type TallyCheck,
+} from "@/lib/admin/pgTally";
 import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
 
@@ -73,6 +81,107 @@ function dateParts(iso: string): { date: string; time: string } {
   };
 }
 
+function RefreshButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      title="Check this collection's status again"
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50"
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn("shrink-0", busy && "animate-spin")}
+        aria-hidden="true"
+      >
+        <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+        <path d="M18 3v5h-5M6 21v-5h5" />
+      </svg>
+      Refresh
+    </button>
+  );
+}
+
+type CheckResult =
+  | { status: "pending"; reference: string }
+  | { status: "ok"; reference: string; check: BpayStatusCheck }
+  | { status: "error"; reference: string; error: string };
+
+/** "Checking…" while the vendor's status check runs, then its message and fields. Native <dialog>. */
+function CheckResultDialog({ result, onClose }: { result: CheckResult; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === dialogRef.current) onClose();
+      }}
+      aria-labelledby="pg-check-title"
+      className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="pg-check-title" className="text-base font-semibold text-text-primary">
+          {result.status === "pending" ? "Checking…" : result.status === "ok" ? "Status checked" : "Status check failed"}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-brand-light hover:text-text-primary"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      <p className="mt-1 font-mono text-xs text-text-secondary">{result.reference}</p>
+      <p className={cn("mt-3 text-sm", result.status === "error" ? "text-red-600" : "text-text-primary")}>
+        {result.status === "pending"
+          ? "Asking the payments service for the latest status…"
+          : result.status === "ok"
+            ? result.check.message
+            : result.error}
+      </p>
+      {result.status === "ok" && result.check.fields.length > 0 && (
+        <dl className="mt-3 space-y-1.5 rounded-lg bg-brand-light/50 px-3 py-2.5 text-xs">
+          {result.check.fields.map((field) => (
+            <div key={field.label} className="flex items-baseline justify-between gap-4">
+              <dt className="text-text-secondary">{field.label}</dt>
+              <dd className="min-w-0 truncate text-right font-medium text-text-primary">{field.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {result.status !== "pending" && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 w-full rounded-lg bg-brand-gradient py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+        >
+          Close
+        </button>
+      )}
+    </dialog>
+  );
+}
+
 const inputClasses =
   "h-9 rounded-lg border border-brand-border bg-white px-2.5 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/15";
 
@@ -110,6 +219,28 @@ export function PgTallyView() {
     }, AUTO_REFRESH_MS);
     return () => clearInterval(interval);
   }, [range]);
+
+  // Status check for one collection (vendor CanRefresh). The tally reloads quietly afterwards.
+  const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
+  const checking = checkResult?.status === "pending";
+  async function checkStatus(reference: string) {
+    if (checking) return;
+    setCheckResult({ status: "pending", reference });
+    try {
+      const response = await fetch("/api/dashboard/admin/pg-tally/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ referenceNumber: reference }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.check) setCheckResult({ status: "ok", reference, check: data.check });
+      else setCheckResult({ status: "error", reference, error: data?.error || "The status check didn't go through." });
+    } catch {
+      setCheckResult({ status: "error", reference, error: "Network error. Check your connection and try again." });
+    }
+    const next = await loadTally(range);
+    if (next.status === "ready") setState(next);
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -378,7 +509,12 @@ export function PgTallyView() {
                           <StatusBadge status={row.status} />
                         </td>
                         <td className="px-3 py-2">
-                          <WalletBadge row={row} />
+<span className="flex items-center gap-2">
+                            {!(row.canRefresh && !WALLET[tallyCheck(row)]) && <WalletBadge row={row} />}
+                            {row.canRefresh && row.referenceNumber && (
+                              <RefreshButton busy={checking && checkResult?.reference === row.referenceNumber} onClick={() => checkStatus(row.referenceNumber)} />
+                            )}
+                          </span>
                         </td>
                       </tr>
                     );
@@ -415,7 +551,12 @@ export function PgTallyView() {
                       </div>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2 border-t border-brand-border/70 pt-2 text-xs">
-                      <WalletBadge row={row} />
+<span className="flex items-center gap-2">
+                      {!(row.canRefresh && !WALLET[tallyCheck(row)]) && <WalletBadge row={row} />}
+                      {row.canRefresh && row.referenceNumber && (
+                        <RefreshButton busy={checking && checkResult?.reference === row.referenceNumber} onClick={() => checkStatus(row.referenceNumber)} />
+                      )}
+                          </span>
                       <span className="min-w-0 truncate text-right font-mono text-text-secondary">
                         {row.referenceNumber || row.collectionId}
                         {row.collectionId && row.collectionId !== row.referenceNumber && row.referenceNumber && (
@@ -430,6 +571,7 @@ export function PgTallyView() {
           </>
         )}
       </div>
+      {checkResult && <CheckResultDialog result={checkResult} onClose={() => setCheckResult(null)} />}
     </section>
   );
 }

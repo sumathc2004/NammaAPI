@@ -21,7 +21,12 @@ export type PgTallyRow = {
   /** How many times this collection was credited to the wallet (should be 1 for SUCCESS, 0 otherwise). */
   walletCreditCount: number;
   walletCreditTime: string | null;
+  /** Vendor says a status check (bpayStatusCheck_admin) can update this collection. */
+  canRefresh: boolean;
 };
+
+/** Result of an admin status check, shown in the popup: the vendor's message plus its plain fields. */
+export type BpayStatusCheck = { message: string; fields: { label: string; value: string }[] };
 
 /** Whether a collection's wallet credit adds up. */
 export type TallyCheck = "ok" | "not-credited" | "double-credited" | "pending" | "failed" | "wrongly-credited";
