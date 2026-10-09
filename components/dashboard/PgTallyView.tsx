@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { DatePicker } from "@/components/dashboard/DatePicker";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   groupByRetailer,
   isTallyIssue,
@@ -11,7 +10,7 @@ import {
   type PgTallyRow,
   type TallyCheck,
 } from "@/lib/admin/pgTally";
-import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
+import { toIsoDate } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
 
 /** How often the tally quietly re-loads itself. */
@@ -245,8 +244,6 @@ const inputClasses =
 export function PgTallyView() {
   const today = toIsoDate(new Date());
   const [range, setRange] = useState<Range>({ from: today, to: today });
-  const [draft, setDraft] = useState<Range>(range);
-  const [rangeError, setRangeError] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [viewId, setViewId] = useState<ViewId>("all");
   const [retailer, setRetailer] = useState("");
@@ -269,6 +266,12 @@ export function PgTallyView() {
   });
   useEffect(() => {
     const interval = setInterval(async () => {
+      // No date selection here (always today): after midnight, move on to the new day.
+      const now = toIsoDate(new Date());
+      if (range.from !== now) {
+        setRange({ from: now, to: now });
+        return;
+      }
       if (document.hidden || statusRef.current !== "ready") return;
       const next = await loadTally(range);
       if (next.status === "ready") setState(next);
@@ -296,15 +299,6 @@ export function PgTallyView() {
     }
     const next = await loadTally(range);
     if (next.status === "ready") setState(next);
-  }
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    const error = validateRange(draft.from, draft.to, "pg-reports");
-    setRangeError(error);
-    if (error) return;
-    setState({ status: "loading" });
-    setRange({ ...draft });
   }
 
   const rows = useMemo(() => (state.status === "ready" ? state.rows : []), [state]);
@@ -335,50 +329,16 @@ export function PgTallyView() {
 
   return (
     <section aria-labelledby="pg-tally-title" className="@container flex flex-col gap-2">
-      {/* One compact line: title + date range */}
-      <div className="flex flex-col gap-2 @2xl:flex-row @2xl:items-center @2xl:justify-between">
+      {/* Title only: the tally always shows today. */}
+      <div>
         <h2
           id="pg-tally-title"
-          title="Card collections vs wallet credits"
+          title="Card collections vs wallet credits (today)"
           className="text-lg font-bold tracking-tight text-text-primary"
         >
           PG Tally
         </h2>
-        <form onSubmit={handleSubmit} className="flex w-full items-center gap-1.5 @2xl:w-auto">
-          <DatePicker
-            label="From"
-            value={draft.from}
-            min={reportStartDate("pg-reports")}
-            max={draft.to}
-            onChange={(from) => setDraft((d) => ({ ...d, from }))}
-            className="min-w-0 flex-1 @lg:w-52 @lg:flex-none"
-          />
-          <span aria-hidden="true" className="hidden text-text-secondary @lg:inline">
-            →
-          </span>
-          <DatePicker
-            label="To"
-            value={draft.to}
-            min={draft.from}
-            max={today}
-            align="right"
-            onChange={(to) => setDraft((d) => ({ ...d, to }))}
-            className="min-w-0 flex-1 @lg:w-52 @lg:flex-none"
-          />
-          <button
-            type="submit"
-            disabled={state.status === "loading"}
-            className="h-9 shrink-0 rounded-lg bg-brand-gradient px-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60 @lg:px-4"
-          >
-            Apply
-          </button>
-        </form>
       </div>
-      {rangeError && (
-        <p role="alert" className="text-right text-xs font-medium text-red-600">
-          {rangeError}
-        </p>
-      )}
 
       <div className="@lg:overflow-hidden @lg:rounded-2xl @lg:border @lg:border-brand-border @lg:bg-white @lg:shadow-sm">
         {/* Toolbar: tabs, retailer, search, totals */}
@@ -508,7 +468,7 @@ export function PgTallyView() {
         {ready && visible.length > 0 && (
           <>
             {/* Tablet and up: table */}
-            <div className="scrollbar-light hidden max-h-[28rem] overflow-auto @lg:block @5xl:max-h-[34rem]">
+            <div className="scrollbar-light hidden max-h-[32rem] overflow-auto @lg:block @5xl:max-h-[34rem]">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-brand-light/95 backdrop-blur">
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">

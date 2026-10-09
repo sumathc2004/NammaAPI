@@ -677,12 +677,18 @@ export function ReportView({
   useEffect(() => {
     const scheduledFor = range;
     const interval = setInterval(async () => {
+      // Compact panel (no date pickers): after midnight, move on to the new day.
+      const now = toIsoDate(new Date());
+      if (compact && (scheduledFor.from !== now || scheduledFor.to !== now)) {
+        setRange({ from: now, to: now });
+        return;
+      }
       if (document.hidden || busyRef.current || statusRef.current !== "ready") return;
       const next = await loadReport(section, scheduledFor);
       if (next.status === "ready" && rangeRef.current === scheduledFor && !busyRef.current) setState(next);
     }, AUTO_REFRESH_MS);
     return () => clearInterval(interval);
-  }, [section, range]);
+  }, [section, range, compact]);
 
   async function runTransferAction(action: TransferAction, uniqueTxnId: string, id: string) {
     if (pendingAction) return;
@@ -829,38 +835,41 @@ export function ReportView({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <form onSubmit={handleSubmit} className={cn("flex w-full items-center gap-1.5", !compact && "md:w-auto")}>
-            {/* Nothing before the section's start date can be picked; the server enforces the same limit. */}
-            <DatePicker
-              label="From"
-              value={draft.from}
-              min={reportStartDate(section)}
-              max={draft.to}
-              onChange={(from) => setDraft((d) => ({ ...d, from }))}
-              className="min-w-0 flex-1 md:w-52 md:flex-none"
-            />
-            <span className="text-sm text-text-secondary" aria-hidden="true">
-              →
-            </span>
-            <DatePicker
-              label="To"
-              value={draft.to}
-              min={draft.from}
-              max={today}
-              align="right"
-              onChange={(to) => setDraft((d) => ({ ...d, to }))}
-              className="min-w-0 flex-1 md:w-52 md:flex-none"
-            />
-            <button
-              type="submit"
-              disabled={state.status === "loading"}
-              className="h-9 shrink-0 rounded-lg bg-brand-gradient px-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60 md:px-4"
-            >
-              Apply
-            </button>
-          </form>
-        </div>
+        {/* The compact (admin) panel has no date selection: it always shows today. */}
+        {!compact && (
+          <div className="flex flex-wrap items-center gap-2">
+            <form onSubmit={handleSubmit} className={cn("flex w-full items-center gap-1.5", !compact && "md:w-auto")}>
+              {/* Nothing before the section's start date can be picked; the server enforces the same limit. */}
+              <DatePicker
+                label="From"
+                value={draft.from}
+                min={reportStartDate(section)}
+                max={draft.to}
+                onChange={(from) => setDraft((d) => ({ ...d, from }))}
+                className="min-w-0 flex-1 md:w-52 md:flex-none"
+              />
+              <span className="text-sm text-text-secondary" aria-hidden="true">
+                →
+              </span>
+              <DatePicker
+                label="To"
+                value={draft.to}
+                min={draft.from}
+                max={today}
+                align="right"
+                onChange={(to) => setDraft((d) => ({ ...d, to }))}
+                className="min-w-0 flex-1 md:w-52 md:flex-none"
+              />
+              <button
+                type="submit"
+                disabled={state.status === "loading"}
+                className="h-9 shrink-0 rounded-lg bg-brand-gradient px-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60 md:px-4"
+              >
+                Apply
+              </button>
+            </form>
+          </div>
+        )}
       </div>
       {rangeError && (
         <p role="alert" className="text-right text-xs font-medium text-red-600">
