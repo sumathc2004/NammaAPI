@@ -38,7 +38,7 @@ export default function AutomationPage() {
       </PageHero>
 
       <section className="bg-white py-20 sm:py-24">
-        <div className="mx-auto grid max-w-[1600px] gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
           <div>
             <h2 className="text-2xl font-bold text-text-primary">What you can build</h2>
             <ul className="mt-6 space-y-4">

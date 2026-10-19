@@ -1,12 +1,24 @@
 "use client";
 
-import { useEffect, useState, type FocusEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useState, useSyncExternalStore, type FocusEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { primaryNav } from "@/lib/data/nav";
 import { cn } from "@/lib/cn";
+import { SIGNED_IN_COOKIE } from "@/lib/auth/constants";
+
+const noopSubscribe = () => () => {};
+
+/** Reads the JS-visible sign-in flag. Re-evaluated on every render (e.g. after navigation). */
+function useSignedIn() {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => document.cookie.split("; ").some((c) => c === `${SIGNED_IN_COOKIE}=1`),
+    () => false,
+  );
+}
 
 const MOBILE_MENU_ID = "mobile-menu";
 
@@ -20,6 +32,7 @@ function Chevron() {
 
 export function Header() {
   const pathname = usePathname();
+  const signedIn = useSignedIn();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [lastPathname, setLastPathname] = useState(pathname);
@@ -129,15 +142,23 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <Link
-            href="/login"
-            className="rounded-lg px-3.5 py-2 text-sm font-semibold text-text-primary transition-colors hover:text-brand-primary"
-          >
-            Login
-          </Link>
-          <Button href="/signup" size="sm">
-            Get Started
-          </Button>
+          {signedIn ? (
+            <Button href="/dashboard" size="sm">
+              Dashboard
+            </Button>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="rounded-lg px-3.5 py-2 text-sm font-semibold text-text-primary transition-colors hover:text-brand-primary"
+              >
+                Login
+              </Link>
+              <Button href="/signup" size="sm">
+                Get Started
+              </Button>
+            </>
+          )}
         </div>
 
         <button
@@ -199,12 +220,20 @@ export function Header() {
             </div>
           ))}
           <div className="mt-3 flex flex-col gap-2">
-            <Button href="/login" variant="secondary" size="sm" onClick={closeMobile}>
-              Login
-            </Button>
-            <Button href="/signup" size="sm" onClick={closeMobile}>
-              Get Started
-            </Button>
+            {signedIn ? (
+              <Button href="/dashboard" size="sm" onClick={closeMobile}>
+                Dashboard
+              </Button>
+            ) : (
+              <>
+                <Button href="/login" variant="secondary" size="sm" onClick={closeMobile}>
+                  Login
+                </Button>
+                <Button href="/signup" size="sm" onClick={closeMobile}>
+                  Get Started
+                </Button>
+              </>
+            )}
           </div>
         </nav>
       </div>

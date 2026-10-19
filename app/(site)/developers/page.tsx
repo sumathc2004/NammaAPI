@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { buildMetadata } from "@/lib/metadata";
+import { ApiStatus } from "@/components/sections/ApiStatus";
 import { DocsSidebar } from "@/components/sections/DocsSidebar";
 import { ApiEndpoint } from "@/components/ui/ApiEndpoint";
 import { CodeBlock } from "@/components/ui/CodeBlock";
@@ -29,7 +31,7 @@ export default function DevelopersPage() {
         <DocsSidebar className="flex w-max gap-1 whitespace-nowrap [&_ul]:flex [&_ul]:gap-1 [&_ul]:space-y-0" />
       </div>
 
-      <div className="grid gap-10 lg:grid-cols-[220px_1fr]">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[220px_1fr]">
         <DocsSidebar className="hidden lg:sticky lg:top-24 lg:block lg:h-fit" />
 
         <div className="min-w-0">
@@ -60,6 +62,14 @@ export default function DevelopersPage() {
               Sandbox API keys let you integrate and test end-to-end flows without moving real funds. Sandbox and
               production environments use separate credentials and are fully isolated from each other.
             </p>
+          </section>
+
+          <section id="status" className="scroll-mt-28 border-b border-brand-border py-12">
+            <h2 className="text-2xl font-bold text-text-primary">API Status</h2>
+            <p className="mt-3 max-w-2xl text-text-secondary">Current availability of NammaAPI services.</p>
+            <Suspense fallback={<p className="mt-5 text-sm text-text-secondary">Checking status…</p>}>
+              <ApiStatus />
+            </Suspense>
           </section>
 
           {apiEndpoints.map((endpoint) => (

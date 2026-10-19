@@ -52,6 +52,12 @@ export const dashboardSections = [
     role: "accountant",
   },
   {
+    id: "filing",
+    label: "Filing",
+    description: "Monthly invoices for filing, for admins and accountants.",
+    role: "adminOrAccountant",
+  },
+  {
     id: "super-access",
     label: "Super Access",
     description: "BUL account balances and the PG tally.",

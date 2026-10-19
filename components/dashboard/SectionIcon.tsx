@@ -63,6 +63,12 @@ const paths = {
       <path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01" />
     </>
   ),
+  filing: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+      <path d="M14 3v5h5M9 13h6M9 17h6" />
+    </>
+  ),
   "super-access": (
     <>
       <circle cx="8.5" cy="14.5" r="3.5" />

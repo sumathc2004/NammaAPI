@@ -1,97 +1,83 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
 import { FormInput, FormSelect } from "@/components/ui/FormInput";
 import { Button } from "@/components/ui/Button";
-import { businessTypeOptions } from "@/lib/data/leadOptions";
-import { isValidEmail, isValidPhone } from "@/lib/validation/fields";
+import { signup, type SignupState } from "@/app/actions/auth";
 
-type FormState = {
-  companyName: string;
-  businessEmail: string;
-  phoneNumber: string;
-  password: string;
-  businessType: string;
-  acceptTerms: boolean;
-};
+const businessTypes = [
+  { value: "college", label: "College / Educational Institution" },
+  { value: "travel", label: "Travel Company" },
+  { value: "insurance", label: "Insurance Business" },
+  { value: "ca-firm", label: "CA Firm" },
+  { value: "corporate", label: "Corporate / Enterprise" },
+  { value: "startup", label: "Startup / Technology Platform" },
+  { value: "other", label: "Other" },
+];
 
-const initialState: FormState = {
-  companyName: "",
-  businessEmail: "",
-  phoneNumber: "",
-  password: "",
-  businessType: "",
-  acceptTerms: false,
+const initialState: SignupState = {
+  values: { companyName: "", businessEmail: "", phoneNumber: "", businessType: "", acceptTerms: false },
+  errors: {},
 };
 
 export function SignupForm() {
-  const [form, setForm] = useState<FormState>(initialState);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
-  const [attempted, setAttempted] = useState(false);
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.companyName.trim()) next.companyName = "Company name is required.";
-    if (!isValidEmail(form.businessEmail.trim())) next.businessEmail = "Enter a valid business email.";
-    if (!isValidPhone(form.phoneNumber.trim())) next.phoneNumber = "Enter a valid phone number.";
-    if (form.password.length < 8) next.password = "Password must be at least 8 characters.";
-    if (!form.businessType) next.businessType = "Please select a business type.";
-    if (!form.acceptTerms) next.acceptTerms = "You must accept the Terms & Conditions.";
-    setErrors(next);
-    if (Object.keys(next).length === 0) setAttempted(true);
-  }
+  const [state, formAction, pending] = useActionState(signup, initialState);
+  const { values, errors } = state;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-5">
+    // key remounts the fields with the submitted values after React resets the form
+    <form key={JSON.stringify(values)} action={formAction} noValidate className="space-y-5">
+      {state.message && (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {state.message}
+        </p>
+      )}
+
       <FormInput
         label="Company Name"
+        name="companyName"
         required
-        autoComplete="organization"
-        value={form.companyName}
-        onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+        defaultValue={values.companyName}
         error={errors.companyName}
         placeholder="Acme Pvt Ltd"
       />
       <FormInput
         label="Business Email"
+        name="businessEmail"
         type="email"
         required
         autoComplete="email"
-        value={form.businessEmail}
-        onChange={(e) => setForm({ ...form, businessEmail: e.target.value })}
+        defaultValue={values.businessEmail}
         error={errors.businessEmail}
         placeholder="you@company.com"
       />
       <FormInput
         label="Phone Number"
+        name="phoneNumber"
         type="tel"
         required
-        autoComplete="tel"
-        value={form.phoneNumber}
-        onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+        defaultValue={values.phoneNumber}
         error={errors.phoneNumber}
         placeholder="+91 98765 43210"
       />
       <FormInput
         label="Password"
+        name="password"
         type="password"
         required
         autoComplete="new-password"
-        value={form.password}
-        onChange={(e) => setForm({ ...form, password: e.target.value })}
         error={errors.password}
         hint="At least 8 characters."
         placeholder="••••••••"
       />
       <FormSelect
         label="Business Type"
+        name="businessType"
         required
-        options={businessTypeOptions}
+        options={businessTypes}
         placeholder="Select business type"
-        value={form.businessType}
-        onChange={(e) => setForm({ ...form, businessType: e.target.value })}
+        defaultValue={values.businessType}
         error={errors.businessType}
       />
 
@@ -99,9 +85,9 @@ export function SignupForm() {
         <label className="flex items-start gap-2.5 text-sm text-text-secondary">
           <input
             type="checkbox"
+            name="acceptTerms"
             className="mt-0.5 h-3.5 w-3.5 accent-brand-primary"
-            checked={form.acceptTerms}
-            onChange={(e) => setForm({ ...form, acceptTerms: e.target.checked })}
+            defaultChecked={values.acceptTerms}
           />
           <span>
             I accept the{" "}
@@ -122,16 +108,9 @@ export function SignupForm() {
         )}
       </div>
 
-      <Button type="submit" size="lg" className="w-full">
-        Create Account
+      <Button type="submit" size="lg" className="w-full" disabled={pending}>
+        {pending ? "Creating account…" : "Create Account"}
       </Button>
-
-      {attempted && (
-        <p className="rounded-lg border border-brand-border bg-brand-light px-4 py-3 text-xs text-text-secondary">
-          This is a demo UI — account creation is not yet connected to a backend. Once the ASP.NET Core API is
-          integrated, this form will create your business account.
-        </p>
-      )}
 
       <p className="text-center text-sm text-text-secondary">
         Already have an account?{" "}

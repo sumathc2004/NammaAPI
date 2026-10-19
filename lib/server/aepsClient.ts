@@ -25,6 +25,8 @@ type AepsRequestOptions = {
    * e.g. "BpPayment" calls ".../api/BpPayment/<endpoint>".
    */
   controller?: string;
+  /** How long to wait for the vendor before giving up. Default 20s; slow bulk jobs can ask for more. */
+  timeoutMs?: number;
 };
 
 const ACCEPT = {
@@ -48,7 +50,7 @@ const xmlParser = new XMLParser({
 export async function aepsRequest(
   endpoint: string,
   params: Record<string, string>,
-  { api = "aeps", method = "GET", prefer = "xml", controller }: AepsRequestOptions = {},
+  { api = "aeps", method = "GET", prefer = "xml", controller, timeoutMs = REQUEST_TIMEOUT_MS }: AepsRequestOptions = {},
 ): Promise<AepsResult> {
   const base = api === "client" ? getClientApiBaseUrl() : getAepsApiBaseUrl();
   // Swap the last path segment (".../api/aeps") for another controller when asked.
@@ -62,7 +64,7 @@ export async function aepsRequest(
     const response = await fetch(url, {
       method,
       headers: { Accept: ACCEPT[prefer] },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
     });
     responseText = (await response.text()).trim();

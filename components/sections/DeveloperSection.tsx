@@ -44,7 +44,7 @@ export function DeveloperSection() {
           light
         />
 
-        <div className="mt-14 grid gap-10 lg:grid-cols-2 lg:items-center">
+        <div className="mt-14 grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-center">
           <div>
             <div className="flex flex-wrap gap-2">
               {capabilities.map((c) => (

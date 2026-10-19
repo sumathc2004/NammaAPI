@@ -10,6 +10,7 @@ const sections: DocsSidebarSection[] = [
   { id: "getting-started", label: "Getting Started" },
   { id: "authentication", label: "Authentication" },
   { id: "sandbox", label: "Sandbox" },
+  { id: "status", label: "API Status" },
   { id: "create-payout", label: "Payout API" },
   { id: "create-payment", label: "Payment API" },
   { id: "add-beneficiary", label: "Beneficiary API" },

@@ -6,12 +6,14 @@
 export type AdminFlags = { isAdmin?: boolean; isAccountant?: boolean; isSuperAccess?: boolean };
 
 /** The role-only sidebar pages. */
-export type PageRole = "admin" | "accountant" | "superAccess";
+/** `adminOrAccountant` is for pages both of those roles share (Filing). */
+export type PageRole = "admin" | "accountant" | "adminOrAccountant" | "superAccess";
 
 /** Whether the account has the flag a role-only page needs. */
 export function hasPageRole(flags: AdminFlags | null | undefined, role: PageRole): boolean {
   if (role === "admin") return flags?.isAdmin === true;
   if (role === "accountant") return flags?.isAccountant === true;
+  if (role === "adminOrAccountant") return flags?.isAdmin === true || flags?.isAccountant === true;
   return flags?.isSuperAccess === true;
 }
 

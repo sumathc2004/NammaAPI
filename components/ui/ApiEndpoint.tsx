@@ -64,7 +64,7 @@ export function ApiEndpoint({ endpoint }: { endpoint: ApiEndpointDoc }) {
         </div>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
             Request — sample data
