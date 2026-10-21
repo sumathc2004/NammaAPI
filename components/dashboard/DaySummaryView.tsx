@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { DaySummary, DaySummaryPart } from "@/lib/admin/daySummary";
+import { cn } from "@/lib/cn";
 
 /** How often the summary quietly re-loads itself. */
 const AUTO_REFRESH_MS = 30_000;
@@ -67,8 +68,32 @@ function SummaryCard({ title, icon, part }: { title: string; icon: keyof typeof 
   );
 }
 
-/** Admin: today's transfers, PG collections and card payments at a glance (vendor TransferPgDaySummary). */
-export function DaySummaryView() {
+/** One figure without a card of its own, for the inline "Today" group: icon, name, amount. */
+function InlineFigure({ title, icon, part }: { title: string; icon: keyof typeof ICONS; part: DaySummaryPart }) {
+  return (
+    <div
+      className="flex min-w-0 items-center gap-2 border-l border-brand-border pl-2.5 min-[1680px]:pl-4"
+      title={`${part.success} of ${part.count} successful · ${inr(part.amount)} attempted`}
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-gradient text-white">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {ICONS[icon]}
+        </svg>
+      </span>
+      <div className="min-w-0 leading-tight">
+        <p className="text-[11px] font-medium text-text-secondary">{title}</p>
+        <p className="text-base font-bold tabular-nums text-text-primary">{inr(part.successAmount)}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Admin: today's transfers, PG collections and card payments at a glance (vendor TransferPgDaySummary).
+ * `inline`: no heading or row of its own — one group card ("Today" with the three figures) meant to
+ * sit among the API balance cards, so the admin page's top stays short enough to fit the panels below.
+ */
+export function DaySummaryView({ inline = false }: { inline?: boolean }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
@@ -94,6 +119,38 @@ export function DaySummaryView() {
     }, AUTO_REFRESH_MS);
     return () => clearInterval(interval);
   }, []);
+
+  if (inline) {
+    return (
+      <div
+        role="group"
+        aria-label="Today's summary"
+        className={cn(
+          "flex flex-auto flex-wrap items-center gap-x-2.5 gap-y-2 rounded-xl border px-3 py-2 min-[1680px]:gap-x-4 min-[1680px]:px-4",
+          state.status === "error" ? "border-red-200 bg-red-50" : "border-brand-border bg-white",
+        )}
+        aria-busy={state.status === "loading"}
+      >
+        <div className="w-full sm:w-auto">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Today</p>
+          <p className="text-[11px] text-text-secondary">Successful</p>
+        </div>
+        {state.status === "loading" && <div className="h-9 w-72 max-w-full animate-pulse rounded-lg bg-brand-light/60" />}
+        {state.status === "error" && (
+          <p role="alert" className="text-xs text-red-700">
+            {state.message}
+          </p>
+        )}
+        {state.status === "ready" && (
+          <>
+            <InlineFigure title="Transfers" icon="transfers" part={state.summary.transfers} />
+            <InlineFigure title="PG collections" icon="pg" part={state.summary.pg} />
+            <InlineFigure title="Card payments" icon="card" part={state.summary.card} />
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <section aria-labelledby="day-summary-title" className="space-y-1.5">

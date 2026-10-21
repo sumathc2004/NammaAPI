@@ -3,6 +3,8 @@ import { aepsRequest, AEPS_UNEXPECTED_ERROR } from "@/lib/server/aepsClient";
 import { accountLabel, type ApiLevelBalance } from "@/lib/admin/apiBalance";
 import type { BpayStatusCheck, PgTallyRow } from "@/lib/admin/pgTally";
 import type { DaySummary } from "@/lib/admin/daySummary";
+import type { BulkpeEntry, BulkpeStatementPage } from "@/lib/admin/bulkpeStatement";
+import { REPORTS_START_DATE } from "@/lib/reports/dates";
 import type { SessionCredentials } from "@/lib/server/session";
 
 export type ApiBalanceResult = { ok: true; balance: ApiLevelBalance } | { ok: false; error: string };
@@ -196,4 +198,72 @@ export async function fetchDaySummary(credentials: SessionCredentials, from: str
       },
     },
   };
+}
+
+export type BulkpeStatementResult = { ok: true; statement: BulkpeStatementPage } | { ok: false; error: string };
+
+/** Calendar day in India ("2026-10-21") of a vendor UTC timestamp, or null when it doesn't parse. */
+function indiaDay(iso: string): string | null {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(date);
+}
+
+/**
+ * Admin-only: `GET {CLIENT_API_BASE_URL}/APIClient/GetBulkpeStatement?pageNo=N` — the platform's
+ * Bulkpe account statement, newest first, 150 entries per page. Response: { status: "true", page,
+ * count, data: [{ transaction_id, reference_id, beneficiaryName, account_number, ifsc, amount,
+ * payment_mode, payment_remark, statusDescription, status, utr, holderName, type, charge, gst,
+ * settelment_amount, closing_balance, createdAt, updatedAt, … , token }] }.
+ *
+ * The vendor endpoint needs no credentials (anyone with the URL can read the whole statement), so
+ * the role check on our route is the only gate. Only the fields below reach the browser: the
+ * virtual-account fields and the full account number are dropped here. `token` is the code of the
+ * BUL account the entry went through ("8539" → the "BUL 8539" card in the API level balance).
+ */
+export async function fetchBulkpeStatement(page: number): Promise<BulkpeStatementResult> {
+  const result = await aepsRequest("APIClient/GetBulkpeStatement", { pageNo: String(page) }, { api: "client", prefer: "json" });
+  if (!result.ok) return result;
+
+  const body = (result.body && typeof result.body === "object" ? result.body : {}) as Record<string, unknown>;
+  if (!Array.isArray(body.data)) {
+    console.error(`AEPS GetBulkpeStatement did not return a list (keys: ${Object.keys(body).join(",")}).`);
+    return { ok: false, error: AEPS_UNEXPECTED_ERROR };
+  }
+
+  const all: BulkpeEntry[] = (body.data as Record<string, unknown>[]).map((r) => {
+    const account = text(r.account_number);
+    return {
+      id: text(r.transaction_id) || text(r.transcation_id),
+      reference: text(r.reference_id),
+      type: text(r.type),
+      mode: text(r.payment_mode),
+      amount: toNumber(r.amount) ?? 0,
+      charge: toNumber(r.charge) ?? 0,
+      gst: toNumber(r.gst) ?? 0,
+      settlementAmount: toNumber(r.settelment_amount),
+      closingBalance: toNumber(r.closing_balance),
+      status: text(r.status).toUpperCase() || "PENDING",
+      statusDescription: text(r.statusDescription),
+      utr: text(r.utr),
+      // Names arrive as "Mr_SHYAM_S".
+      beneficiaryName: text(r.beneficiaryName).replace(/_+/g, " ").trim(),
+      holderName: text(r.holderName),
+      account: maskAccount(account),
+      ifsc: text(r.ifsc),
+      remark: text(r.payment_remark),
+      bulAccount: text(r.token) ? `BUL ${text(r.token)}` : "",
+      createdAt: text(r.createdAt),
+      updatedAt: text(r.updatedAt),
+    };
+  });
+
+  // Same rule as every report: nothing before the start date (or without a readable date) is shown.
+  const entries = all.filter((entry) => {
+    const day = indiaDay(entry.createdAt);
+    return day !== null && day >= REPORTS_START_DATE;
+  });
+  const pageSize = toNumber(body.count) ?? 150;
+  // An older page can exist only if this one was full and nothing in it was cut off by the start date.
+  const hasMore = all.length > 0 && all.length >= pageSize && entries.length === all.length;
+  return { ok: true, statement: { page, entries, hasMore } };
 }
