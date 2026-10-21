@@ -148,7 +148,8 @@ function EntryRow({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="grid w-full grid-cols-[3.25rem_1.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2.5 text-left transition-colors hover:bg-brand-light/50"
+        // Phones (panel narrower than @md): no direction icon column, so the name gets the room.
+        className="grid w-full grid-cols-[3.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2.5 text-left transition-colors hover:bg-brand-light/50 @md:grid-cols-[3.25rem_1.75rem_minmax(0,1fr)_auto]"
       >
         <span className="tabular-nums">
           {!isToday && <span className="block text-[11px] text-text-secondary">{day}</span>}
@@ -158,7 +159,7 @@ function EntryRow({
         {/* Direction: money in (green, arrow down) or a payout (arrow up); red when it failed. */}
         <span
           className={cn(
-            "mt-0.5 flex size-7 items-center justify-center rounded-full",
+            "mt-0.5 hidden size-7 items-center justify-center rounded-full @md:flex",
             failed ? "bg-status-failed-bg text-status-failed" : credit ? "bg-status-success-bg text-status-success" : "bg-brand-light text-brand-navy",
           )}
           title={failed ? "Failed: no money moved" : credit ? "Money in" : "Payout"}
@@ -170,8 +171,9 @@ function EntryRow({
         </span>
 
         <span className="min-w-0">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-sm font-medium text-text-primary" title={entryTitle(entry)}>
+          {/* The BUL chip wraps under the name when there's no room beside it. */}
+          <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <span className="max-w-full truncate text-sm font-medium text-text-primary" title={entryTitle(entry)}>
               {entryTitle(entry)}
             </span>
             {entry.bulAccount && (
@@ -307,7 +309,8 @@ export function BulkpeStatementView() {
   return (
     <section aria-labelledby="bulkpe-title" className="@container flex min-w-0 flex-col gap-2 md:h-full">
       {/* Title and the account balance after the latest entry. */}
-      <div className="flex min-w-0 items-center justify-between gap-2">
+      {/* Phones: the balance drops to its own line under the title when it doesn't fit beside it. */}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <h2
           id="bulkpe-title"
           title="Every movement on the Bulkpe payout account, newest first"
@@ -316,7 +319,7 @@ export function BulkpeStatementView() {
           Bulkpe Statement
         </h2>
         {ready && latestBalance !== null && (
-          <dl className="flex min-w-0 items-center divide-x divide-brand-border text-xs">
+          <dl className="ml-auto flex min-w-0 items-center divide-x divide-brand-border text-xs">
             <div className="flex min-w-0 items-baseline gap-1.5 pr-2.5" title="Account balance after the latest entry">
               <dt className="text-text-secondary">Balance</dt>
               <dd className="truncate font-semibold tabular-nums text-text-primary">{inr(latestBalance)}</dd>

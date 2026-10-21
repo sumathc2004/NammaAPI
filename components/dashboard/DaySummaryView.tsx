@@ -72,7 +72,8 @@ function SummaryCard({ title, icon, part }: { title: string; icon: keyof typeof 
 function InlineFigure({ title, icon, part }: { title: string; icon: keyof typeof ICONS; part: DaySummaryPart }) {
   return (
     <div
-      className="flex min-w-0 items-center gap-2 border-l border-brand-border pl-2.5 min-[1680px]:pl-4"
+      // Phones: one figure per full-width row with a line above; from sm: side by side with a line between.
+      className="flex w-full min-w-0 items-center gap-2 border-t border-brand-border pt-2 sm:w-auto sm:border-l sm:border-t-0 sm:pl-2.5 sm:pt-0 min-[1680px]:pl-4"
       title={`${part.success} of ${part.count} successful · ${inr(part.amount)} attempted`}
     >
       <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-gradient text-white">
