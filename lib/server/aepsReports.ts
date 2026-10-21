@@ -126,6 +126,27 @@ const REPORT_ENDPOINTS: Partial<Record<DashboardSectionId, ReportEndpoint>> = {
       return next;
     },
   },
+  // GET {CLIENT_API_BASE_URL}/APIClient/GetBillPaymentsDatewise?fromDate=&toDate=&userName= — bill
+  // payments (JSON array). No password; the username is always the logged-in account's, from the session.
+  "bill-payments": {
+    endpoint: "APIClient/GetBillPaymentsDatewise",
+    api: "client",
+    prefer: "json",
+    params: (credentials, fromDate, toDate) => ({
+      fromDate: toVendorDate(fromDate),
+      toDate: toVendorDate(toDate),
+      userName: credentials.userName,
+    }),
+    transform: (row) => {
+      const next = { ...row };
+      // The vendor sends the full card number in `fullCardNumber`: it must never leave the server.
+      // `accountNO` already holds just the last digits.
+      delete next.fullCardNumber;
+      // The biller's display name is often missing; fall back to its code.
+      next.biller = (next.destNameForDisplay ?? "").trim() || (next.destAddress ?? "").trim();
+      return next;
+    },
+  },
   // GET .../api/BpPayment/GetLinksByDate?fromDate=&toDate=&mobileNumber= — card payment collections
   // (JSON array). No password; the number comes from the session, as above.
   "pg-reports": {
