@@ -247,7 +247,9 @@ export function ApiBalanceView({ bulOnly = false, extra }: { bulOnly?: boolean; 
 
           {extra}
 
-          {/* The small balances (RUPE, unsettled, pending, …) share one card, each with its share of all balances as text. */}
+          {/* The small balances (RUPE, unsettled, pending, …) share one card, each with its share of all balances as text.
+              Phones: one balance per row (label left, amount right). From sm up: side by side, each at least 9rem wide,
+              so extra balances the vendor adds wrap to a new line instead of squeezing the text into overlap. */}
           {!bulOnly && otherAccounts.length > 0 && (
             <div className="flex flex-auto flex-wrap gap-x-2.5 gap-y-2 rounded-xl border border-brand-border bg-white px-3 py-2 min-[1680px]:gap-x-4 min-[1680px]:px-4">
               {otherAccounts.map((account, i) => {
@@ -256,16 +258,21 @@ export function ApiBalanceView({ bulOnly = false, extra }: { bulOnly?: boolean; 
                 return (
                   <div
                     key={account.key}
-                    className={cn("min-w-0 flex-1", i > 0 && "border-l border-brand-border pl-2.5 min-[1680px]:pl-4")}
+                    className={cn(
+                      "w-full min-w-0 sm:w-auto sm:min-w-36 sm:flex-1",
+                      i > 0 && "border-t border-brand-border pt-2 sm:border-l sm:border-t-0 sm:pl-2.5 sm:pt-0 min-[1680px]:pl-4",
+                    )}
                     title={held ? "Not in an account yet" : undefined}
                   >
-                    <p className={cn("font-mono text-[11px] font-semibold", held ? "text-brand-navy/70" : "text-text-secondary")}>
-                      {account.label}
-                    </p>
-                    <p className={cn("mt-0.5 text-base font-bold tabular-nums", held ? "text-brand-navy" : "text-text-primary")}>
-                      {inr(account.amount)}
-                    </p>
-                    <p className={cn("text-[11px] tabular-nums", held ? "text-brand-navy/70" : "text-text-secondary")}>
+                    <div className="flex items-baseline justify-between gap-3 sm:block">
+                      <p className={cn("font-mono text-[11px] font-semibold", held ? "text-brand-navy/70" : "text-text-secondary")}>
+                        {account.label}
+                      </p>
+                      <p className={cn("text-base font-bold tabular-nums sm:mt-0.5", held ? "text-brand-navy" : "text-text-primary")}>
+                        {inr(account.amount)}
+                      </p>
+                    </div>
+                    <p className={cn("text-right text-[11px] tabular-nums sm:text-left", held ? "text-brand-navy/70" : "text-text-secondary")}>
                       {shareOfAll(account.amount).toFixed(1)}% of balances
                     </p>
                   </div>
