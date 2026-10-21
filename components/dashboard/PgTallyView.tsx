@@ -10,6 +10,7 @@ import {
   type PgTallyRow,
   type TallyCheck,
 } from "@/lib/admin/pgTally";
+import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { toIsoDate } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
 
@@ -70,12 +71,12 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 /** Wallet badge, with the credit date and time underneath once credited. */
-function WalletBadge({ row }: { row: PgTallyRow }) {
+function WalletBadge({ row, className }: { row: PgTallyRow; className?: string }) {
   const wallet = WALLET[tallyCheck(row)];
   if (!wallet) return <span className="text-text-secondary">—</span>;
   const credited = row.walletCreditCount > 0 && row.walletCreditTime ? dateParts(row.walletCreditTime) : null;
   return (
-    <span className="inline-flex flex-col items-start gap-0.5">
+    <span className={cn("inline-flex flex-col items-start gap-0.5", className)}>
       <span className={cn(badge, wallet.className)}>{wallet.text}</span>
       {credited && (
         <span className="whitespace-nowrap pl-1 text-[11px] text-text-secondary" title="Credited to the wallet at">
@@ -243,6 +244,66 @@ function CheckResultDialog({ result, onClose }: { result: CheckResult; onClose: 
 const inputClasses =
   "h-9 rounded-lg border border-brand-border bg-white px-2.5 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/15";
 
+/**
+ * One collection as a compact row, for a narrow panel or a phone: time · retailer and reference ·
+ * credited amount and fee · status with the wallet badge (or the status check) under it.
+ */
+function TallyRow({
+  row,
+  timeOnly,
+  checking,
+  onCheck,
+  className,
+}: {
+  row: PgTallyRow;
+  timeOnly: boolean;
+  checking: boolean;
+  onCheck: () => void;
+  className?: string;
+}) {
+  const { day, time } = dateParts(row.createdDateTime);
+  const issue = isTallyIssue(tallyCheck(row));
+  const showWallet = !(row.canRefresh && !WALLET[tallyCheck(row)]);
+  const canCheck = row.canRefresh && !!row.referenceNumber && !!row.collectionId;
+  const refs = [row.referenceNumber, row.collectionId !== row.referenceNumber ? row.collectionId : ""].filter(Boolean);
+  return (
+    <li
+      className={cn(
+        "grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2",
+        issue && "bg-status-failed-bg/40",
+        className,
+      )}
+    >
+      <span className="tabular-nums">
+        {!timeOnly && <span className="block text-[11px] text-text-secondary">{day}</span>}
+        <span className="block whitespace-nowrap text-sm text-text-primary">{time}</span>
+      </span>
+
+      {/* Retailer: name, mobile number, then the reference and collection ID — wrapped, never cut off. */}
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium text-text-primary" title={row.vendorName}>
+          {row.vendorName}
+        </span>
+        {row.userName && row.userName !== row.vendorName && (
+          <span className="block font-mono text-[11px] text-text-secondary">{row.userName}</span>
+        )}
+        <span className="block font-mono text-[11px] text-text-secondary wrap-anywhere">{refs.join(" · ")}</span>
+      </span>
+
+      {/* Money and state, stacked to stay narrow: credited amount, the fee, status, then the wallet badge or the status check. */}
+      <span className="flex flex-col items-end gap-1 text-right">
+        <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
+        <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title={`${inr(row.debitFromCard)} charged to the card − ${inr(row.charges)} fee`}>
+          − {inr(row.charges)} fee
+        </span>
+        <StatusBadge status={row.status} />
+        {showWallet && WALLET[tallyCheck(row)] && <WalletBadge row={row} className="items-end text-right" />}
+        {canCheck && <RefreshButton busy={checking} onClick={onCheck} />}
+      </span>
+    </li>
+  );
+}
+
 /** Admin: card collections vs wallet credits (vendor PgTallyReport), in the Transfer Reports style. */
 export function PgTallyView() {
   const today = toIsoDate(new Date());
@@ -359,45 +420,10 @@ export function PgTallyView() {
         )}
       </div>
 
-      <div className="xl:flex xl:min-h-0 xl:flex-1 xl:flex-col @lg:overflow-hidden @lg:rounded-2xl @lg:border @lg:border-brand-border @lg:bg-white @lg:shadow-sm">
-        {/* Toolbar: tabs, retailer, search, totals */}
-        <div className="flex flex-wrap items-center gap-2 @lg:border-b @lg:border-brand-border @lg:px-3 @lg:py-2.5 @6xl:flex-nowrap">
-          <div
-            role="group"
-            aria-label="Show"
-            className="flex h-9 w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-brand-border bg-white p-0.5 @5xl:w-auto @5xl:shrink-0"
-          >
-            {VIEWS.map((v) => {
-              const active = v.id === viewId;
-              const count = retailerRows.filter(v.match).length;
-              const alert = v.id === "check" && count > 0;
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setViewId(v.id)}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-colors @5xl:flex-none",
-                    active ? "bg-brand-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary",
-                  )}
-                >
-                  {v.label}
-                  {ready && (
-                    <span
-                      className={cn(
-                        "rounded-full px-1.5 text-[10px] tabular-nums",
-                        active ? "bg-white/20 text-white" : alert ? "bg-status-failed-bg text-status-failed" : "bg-brand-light text-text-secondary",
-                      )}
-                    >
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
+      {/* The box: from tablet up it fills the panel and the list scrolls inside; phones let it grow with the page. */}
+      <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
+        {/* Toolbar, one line when it fits: retailer, status filter, search */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-brand-border px-3 py-2.5">
           <label htmlFor="pg-tally-retailer" className="sr-only">
             Retailer
           </label>
@@ -406,7 +432,7 @@ export function PgTallyView() {
             value={retailer}
             onChange={(e) => setRetailer(e.target.value)}
             disabled={!ready || rows.length === 0}
-            className={cn(inputClasses, "min-w-0 flex-1 pr-8 @5xl:w-44 @5xl:flex-none @6xl:shrink-0")}
+            className={cn(inputClasses, "min-w-0 flex-1 basis-36 truncate pr-8 @3xl:max-w-56")}
           >
             <option value="">All retailers ({rows.length})</option>
             {retailers.map((g) => (
@@ -416,7 +442,22 @@ export function PgTallyView() {
             ))}
           </select>
 
-          <div className="relative min-w-0 flex-1 @5xl:w-44 @5xl:flex-none @6xl:w-auto @6xl:min-w-32 @6xl:flex-1">
+          <FilterSelect
+            id="pg-tally-filter"
+            label="Show"
+            value={viewId}
+            onChange={(id) => setViewId(id as ViewId)}
+            disabled={!ready || rows.length === 0}
+            className="w-36 shrink-0"
+            options={VIEWS.map((v) => ({
+              id: v.id,
+              label: v.label,
+              count: ready ? retailerRows.filter(v.match).length : null,
+              alert: v.id === "check",
+            }))}
+          />
+
+          <div className="relative min-w-0 flex-1 basis-32">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"
@@ -470,9 +511,9 @@ export function PgTallyView() {
         )}
 
         {ready && visible.length > 0 && (
-          <>
-            {/* Tablet and up: table */}
-            <div className="scrollbar-light hidden max-h-[32rem] overflow-auto @lg:block xl:max-h-none xl:min-h-0 xl:flex-1">
+          <div className="scrollbar-light md:min-h-0 md:flex-1 md:overflow-y-auto">
+            {/* Wide panel (≥ @3xl, e.g. the Super Access page): table */}
+            <div className="hidden @3xl:block">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-brand-light/95 backdrop-blur">
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
@@ -565,62 +606,30 @@ export function PgTallyView() {
               </table>
             </div>
 
-            {/* Phones: one card per collection */}
-            {/* Phones: cards scroll with the page (no inner scroll box), 30 at a time. */}
-            <ul className="space-y-2.5 pt-3 @lg:hidden" aria-label="PG tally entries">
-              {visible.slice(0, mobileLimit).map((row) => {
-                const { date, time } = dateParts(row.createdDateTime);
-                const issue = isTallyIssue(tallyCheck(row));
-                return (
-                  <li
-                    key={row.collectionId || row.referenceNumber}
-                    className={cn("rounded-xl border bg-white px-3.5 py-3 shadow-sm", issue ? "border-status-failed/40" : "border-brand-border")}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-text-primary">{row.vendorName}</p>
-                        <p className="text-xs text-text-secondary">
-                          {timeOnly ? time : `${date}, ${time}`}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <span className="text-right">
-                          <span className="block text-base font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
-                          <span className="block text-[11px] tabular-nums text-text-secondary">
-                            {inr(row.debitFromCard)} − {inr(row.charges)} fee
-                          </span>
-                        </span>
-                        <StatusBadge status={row.status} />
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-brand-border/70 pt-2 text-xs">
-<span className="flex items-center gap-2">
-                      {!(row.canRefresh && !WALLET[tallyCheck(row)]) && <WalletBadge row={row} />}
-                      {row.canRefresh && row.referenceNumber && row.collectionId && (
-                        <RefreshButton busy={checking && checkResult?.reference === row.referenceNumber} onClick={() => checkStatus(row.referenceNumber, row.collectionId)} />
-                      )}
-                          </span>
-                      <span className="min-w-0 truncate text-right font-mono text-text-secondary">
-                        {row.referenceNumber || row.collectionId}
-                        {row.collectionId && row.collectionId !== row.referenceNumber && row.referenceNumber && (
-                          <span className="block text-[11px]">{row.collectionId}</span>
-                        )}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
+            {/* Narrow panel (admin page columns) and phones: one compact row per collection */}
+            <ul className="divide-y divide-brand-border/70 @3xl:hidden" aria-label="PG tally entries">
+              {visible.map((row, i) => (
+                <TallyRow
+                  key={row.collectionId || row.referenceNumber}
+                  row={row}
+                  timeOnly={timeOnly}
+                  checking={checking && checkResult?.reference === row.referenceNumber}
+                  onCheck={() => checkStatus(row.referenceNumber, row.collectionId)}
+                  // Phones: 30 rows at a time (the list scrolls with the page); tablet and up: all of them, scrolling inside.
+                  className={cn(i >= mobileLimit && "hidden md:grid")}
+                />
+              ))}
             </ul>
             {visible.length > mobileLimit && (
               <button
                 type="button"
                 onClick={() => setMobileLimit((n) => n + MOBILE_PAGE)}
-                className="mt-2.5 h-10 w-full rounded-lg border border-brand-border bg-white text-sm font-semibold text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light @lg:hidden"
+                className="h-10 w-full border-t border-brand-border text-sm font-semibold text-brand-primary transition-colors hover:bg-brand-light md:hidden"
               >
                 Show more ({visible.length - mobileLimit} left)
               </button>
             )}
-          </>
+          </div>
         )}
       </div>
       {checkResult && <CheckResultDialog result={checkResult} onClose={() => setCheckResult(null)} />}

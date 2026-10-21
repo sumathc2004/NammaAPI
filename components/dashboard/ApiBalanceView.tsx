@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { isBulAccount, type ApiLevelBalance } from "@/lib/admin/apiBalance";
 import { cn } from "@/lib/cn";
 
@@ -68,8 +68,12 @@ function RefreshIcon({ spinning }: { spinning: boolean }) {
   );
 }
 
-/** Admin: platform wallet vs the BUL account balances, from the vendor's getapiLevelbalance. */
-export function ApiBalanceView({ bulOnly = false }: { bulOnly?: boolean }) {
+/**
+ * Admin: platform wallet vs the BUL account balances, from the vendor's getapiLevelbalance.
+ * `extra` is rendered among the cards (after the AEPS IN/OUT card) — the admin page puts today's
+ * summary there so the whole top of the page stays two rows of cards.
+ */
+export function ApiBalanceView({ bulOnly = false, extra }: { bulOnly?: boolean; extra?: ReactNode }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -116,7 +120,7 @@ export function ApiBalanceView({ bulOnly = false }: { bulOnly?: boolean }) {
   const diffMatches = balance?.diff != null && round2(balance.wallet - accountsTotal) === round2(balance.diff);
 
   return (
-    <section aria-labelledby="api-balance-title" className="space-y-2">
+    <section aria-labelledby="api-balance-title" className="shrink-0 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-baseline gap-3">
           <h1 id="api-balance-title" className="text-base font-bold tracking-tight text-text-primary">
@@ -241,28 +245,34 @@ export function ApiBalanceView({ bulOnly = false }: { bulOnly?: boolean }) {
             </div>
           )}
 
-          {(bulOnly ? [] : otherAccounts).map((account) => {
-            // Unsettled and pending money isn't in an account yet, so it gets its own (navy) style.
-            const held = isHeldBalance(account.key);
-            return (
-              <div
-                key={account.key}
-                className={cn(
-                  "flex-auto rounded-xl border px-3 py-2 min-[1680px]:px-3.5",
-                  held ? "border-brand-navy/15 bg-brand-navy/[0.06]" : "border-brand-border bg-white",
-                )}
-              >
-                <p className={cn("font-mono text-[11px] font-semibold", held ? "text-brand-navy/70" : "text-text-secondary")}>
-                  {account.label}
-                </p>
-                <p className={cn("mt-0.5 text-base font-bold tabular-nums", held ? "text-brand-navy" : "text-text-primary")}>
-                  {inr(account.amount)}
-                </p>
-                {/* Share of all balances (BUL accounts and these). */}
-                <ShareBar share={shareOfAll(account.amount)} held={held} />
-              </div>
-            );
-          })}
+          {extra}
+
+          {/* The small balances (RUPE, unsettled, pending, …) share one card, each with its share of all balances as text. */}
+          {!bulOnly && otherAccounts.length > 0 && (
+            <div className="flex flex-auto flex-wrap gap-x-2.5 gap-y-2 rounded-xl border border-brand-border bg-white px-3 py-2 min-[1680px]:gap-x-4 min-[1680px]:px-4">
+              {otherAccounts.map((account, i) => {
+                // Unsettled and pending money isn't in an account yet, so it's marked in navy.
+                const held = isHeldBalance(account.key);
+                return (
+                  <div
+                    key={account.key}
+                    className={cn("min-w-0 flex-1", i > 0 && "border-l border-brand-border pl-2.5 min-[1680px]:pl-4")}
+                    title={held ? "Not in an account yet" : undefined}
+                  >
+                    <p className={cn("font-mono text-[11px] font-semibold", held ? "text-brand-navy/70" : "text-text-secondary")}>
+                      {account.label}
+                    </p>
+                    <p className={cn("mt-0.5 text-base font-bold tabular-nums", held ? "text-brand-navy" : "text-text-primary")}>
+                      {inr(account.amount)}
+                    </p>
+                    <p className={cn("text-[11px] tabular-nums", held ? "text-brand-navy/70" : "text-text-secondary")}>
+                      {shareOfAll(account.amount).toFixed(1)}% of balances
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </section>

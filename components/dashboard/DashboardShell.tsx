@@ -124,7 +124,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <aside
           className={cn(
             "hidden shrink-0 overflow-hidden transition-[width] duration-300 lg:block",
-            sidebarHidden ? "w-0" : collapsed ? "w-18" : "w-64",
+            sidebarHidden ? "w-0" : collapsed ? "w-18" : "w-56",
           )}
         >
           <DashboardSidebar

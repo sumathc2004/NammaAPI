@@ -7,6 +7,7 @@ import { getDashboardSection, type DashboardSectionId } from "@/lib/data/dashboa
 import { clearDemoSession } from "@/lib/auth/demoSession";
 import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
+import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import {
   amountTone,
   applyTransferActionPatch,
@@ -84,6 +85,13 @@ const HIDE_BELOW: Record<NonNullable<ColumnInfo["hideBelow"]>, string> = {
   lg: "hidden lg:table-cell",
   xl: "hidden xl:table-cell",
   "2xl": "hidden 2xl:table-cell",
+};
+
+/** The same, by the width of the panel instead of the screen — for the compact admin panels (`@container`). */
+const HIDE_BELOW_PANEL: Record<NonNullable<ColumnInfo["hideBelow"]>, string> = {
+  lg: "hidden @lg:table-cell",
+  xl: "hidden @xl:table-cell",
+  "2xl": "hidden @2xl:table-cell",
 };
 
 /** Long single tokens such as reference numbers or IDs ("061026131023036730741"). */
@@ -429,11 +437,14 @@ function Pager({
   total,
   onPage,
   className,
+  compact = false,
 }: {
   page: number;
   total: number;
   onPage: (page: number) => void;
   className?: string;
+  /** Narrow panel: "1–50 / 238" in small text. */
+  compact?: boolean;
 }) {
   if (total === 0) return null;
   const pageCount = Math.ceil(total / PAGE_SIZE);
@@ -442,14 +453,14 @@ function Pager({
   const n = (value: number) => value.toLocaleString("en-IN");
 
   return (
-    <nav aria-label="Pages" className={cn("flex items-center gap-2", className)}>
-      <span className="whitespace-nowrap text-xs tabular-nums text-text-secondary" aria-live="polite">
+    <nav aria-label="Pages" className={cn("flex items-center", compact ? "gap-1.5" : "gap-2", className)}>
+      <span className={cn("whitespace-nowrap tabular-nums text-text-secondary", compact ? "text-[11px]" : "text-xs")} aria-live="polite">
         {pageCount > 1 ? (
           <>
             <span className="font-semibold text-text-primary">
               {n(first)}–{n(last)}
             </span>{" "}
-            of {n(total)}
+            {compact ? "/" : "of"} {n(total)}
           </>
         ) : (
           `${n(total)} ${total === 1 ? "entry" : "entries"}`
@@ -500,6 +511,36 @@ const TRANSFER_ACTION_LABELS: Record<TransferAction, { label: string; ariaLabel:
   enqueue: { label: "Enqueue", ariaLabel: "Add to queue" },
   refund: { label: "Refund", ariaLabel: "Process refund" },
 };
+
+/** Dequeue, or Enqueue + Refund, for a transfer row in the compact list (same rules as the table's Status cell). */
+function TransferRowActions({
+  row,
+  pendingAction,
+  onAction,
+}: {
+  row: ReportRow;
+  pendingAction: { uniqueTxnId: string; action: TransferAction } | null;
+  onAction: (action: TransferAction, uniqueTxnId: string, id: string) => void;
+}) {
+  const id = transferRowId(row);
+  if (!id) return null;
+  const refundable = isRefundableTransfer(row);
+  // Refundable takes over Dequeue when both apply — Enqueue/Refund are the relevant actions then.
+  const queued = isQueuedTransfer(row) && !refundable;
+  if (!queued && !refundable) return null;
+  const isPending = (action: TransferAction) => pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === action;
+  return (
+    <span className="flex flex-wrap justify-end gap-1">
+      {queued && <TransferActionButton action="dequeue" pending={isPending("dequeue")} onClick={() => onAction("dequeue", row.UniqueTxnId, id)} />}
+      {refundable && (
+        <>
+          <TransferActionButton action="enqueue" pending={isPending("enqueue")} onClick={() => onAction("enqueue", row.UniqueTxnId, id)} />
+          <TransferActionButton action="refund" pending={isPending("refund")} onClick={() => onAction("refund", row.UniqueTxnId, id)} />
+        </>
+      )}
+    </span>
+  );
+}
 
 function TransferActionButton({
   action,
@@ -841,9 +882,26 @@ export function ReportView({
   const inputClasses =
     "h-9 rounded-lg border border-brand-border bg-white px-2.5 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/15";
 
+  // The compact panel shows a list instead of a table: every column has a place in each row,
+  // whatever the panel's width. Where each goes is decided from the column kinds.
+  const listDate = columns.find((c) => c.kind === "date");
+  const listStatus = columns.find((c) => c.kind === "status");
+  const listAmount = columns.find((c) => c.kind === "amount");
+  const listTitle = columns.find((c) => c.kind === "text" && c.format !== "code");
+  const listCodes = columns.filter((c) => c.kind === "text" && c.format === "code");
+  const listDetails = columns.filter((c) => c.kind === "text" && c.format !== "code" && c !== listTitle);
+  /** The amount for a list row: its own column, or the one shown under the title (Beneficiary / Amount). */
+  const listAmountValue = (row: ReportRow) =>
+    listAmount ? cellValue(listAmount, row) : listTitle?.subKind === "amount" && listTitle.subKey ? (row[listTitle.subKey] ?? "") : "";
+  const listTime = (row: ReportRow) => {
+    if (!listDate) return "";
+    const text = dateCellText(listDate, row);
+    return timeOnly ? (text.split(", ")[1] ?? text) : text;
+  };
   return (
     // Fills the dashboard content area; on tablet and up only the table rows scroll.
-    <div className={cn("flex min-h-0 flex-col", compact ? "h-full gap-2" : "flex-1 gap-3 md:gap-4")}>
+    // The compact panel is a container: its table hides columns by the panel's own width.
+    <div className={cn("flex min-h-0 flex-col", compact ? "@container h-full gap-2" : "flex-1 gap-3 md:gap-4")}>
       {/* Title + date range */}
       <div className={cn("flex flex-col", compact ? "gap-2" : "gap-3 xl:flex-row xl:items-center xl:justify-between")}>
         {compact ? (
@@ -906,12 +964,31 @@ export function ReportView({
           Toolbar. Wider screens, one line: tabs, search, totals, then pager and Export on the right.
           Phones: tabs; search + Export; totals + pager (the wrapper uses md:contents so its
           children join the main row on wider screens).
+          Compact panel: one line — a filter dropdown instead of tabs, search, a small pager, Export as an icon.
         */}
         <div
           ref={toolbarRef}
           className="flex shrink-0 scroll-mt-3 flex-wrap items-center gap-2 md:border-b md:border-brand-border md:px-3 md:py-2.5"
         >
-          {views && (
+          {views && compact && (
+            <FilterSelect
+              id={`${section}-filter`}
+              label="Show"
+              value={activeView?.id ?? views[0].id}
+              onChange={(id) => {
+                setViewId(id);
+                setPage(0);
+              }}
+              disabled={!table}
+              className="w-36 shrink-0"
+              options={views.map((view) => ({
+                id: view.id,
+                label: view.label,
+                count: table ? (view.match ? table.rows.filter(view.match).length : table.rows.length) : null,
+              }))}
+            />
+          )}
+          {views && !compact && (
             <div
               role="group"
               aria-label="Show"
@@ -950,7 +1027,7 @@ export function ReportView({
               })}
             </div>
           )}
-          <div className="relative order-2 min-w-0 flex-1 md:w-56 md:flex-none xl:w-72">
+          <div className={cn("relative min-w-0 flex-1", compact ? "basis-28" : "order-2 md:w-56 md:flex-none xl:w-72")}>
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"
@@ -980,9 +1057,15 @@ export function ReportView({
             />
           </div>
           {(showTotals || filteredRows.length > 0) && (
-            <div className="order-4 flex w-full flex-wrap items-center justify-between gap-2 md:contents">
+            <div className={cn(compact ? "contents" : "order-4 flex w-full flex-wrap items-center justify-between gap-2 md:contents")}>
               {showTotals && totals && <Totals credit={totals.credit} debit={totals.debit} className="md:order-3" />}
-              <Pager page={currentPage} total={filteredRows.length} onPage={goToPage} className="ml-auto md:order-4" />
+              <Pager
+                page={currentPage}
+                total={filteredRows.length}
+                onPage={goToPage}
+                compact={compact}
+                className={cn("ml-auto", !compact && "md:order-4")}
+              />
             </div>
           )}
           <button
@@ -990,12 +1073,15 @@ export function ReportView({
             onClick={exportCsv}
             disabled={filteredRows.length === 0}
             title="Export CSV"
-            className="order-3 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-brand-border bg-white px-2.5 text-sm font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-40 disabled:hover:border-brand-border disabled:hover:text-text-primary md:order-5 md:px-3"
+            className={cn(
+              "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-brand-border bg-white text-sm font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-40 disabled:hover:border-brand-border disabled:hover:text-text-primary",
+              compact ? "w-9 justify-center" : "order-3 px-2.5 md:order-5 md:px-3",
+            )}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
             </svg>
-            <span className="sr-only md:not-sr-only">Export</span>
+            <span className={cn("sr-only", !compact && "md:not-sr-only")}>Export</span>
           </button>
         </div>
 
@@ -1067,8 +1153,55 @@ export function ReportView({
           />
         )}
 
+        {/* Compact panel, tablet and up: a list — time · who (vendor, shop, UTR under it) · amount, status, actions */}
+        {table && filteredRows.length > 0 && compact && (
+          <div ref={tableScrollRef} className="scrollbar-light hidden md:block md:min-h-0 md:flex-1 md:overflow-y-auto">
+            <ul className="divide-y divide-brand-border/70" aria-label={`${label} entries`}>
+              {pageRows.map((row, i) => {
+                const amount = listAmountValue(row);
+                const details = listDetails
+                  .flatMap((c) => [cellValue(c, row), c.subKey && c.subKind !== "amount" ? (row[c.subKey] ?? "") : ""])
+                  .filter(Boolean);
+                return (
+                  <li
+                    key={currentPage * PAGE_SIZE + i}
+                    className="grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2 transition-colors hover:bg-brand-light/40"
+                  >
+                    <span className="whitespace-nowrap text-sm tabular-nums text-text-primary">{listTime(row)}</span>
+                    <span className="min-w-0">
+                      {listTitle && (
+                        <span className="block truncate text-sm font-medium text-text-primary" title={cellValue(listTitle, row)}>
+                          {cellValue(listTitle, row) || "—"}
+                        </span>
+                      )}
+                      {details.length > 0 && (
+                        <span className="block truncate text-xs text-text-secondary" title={details.join(" · ")}>
+                          {details.join(" · ")}
+                        </span>
+                      )}
+                      {listCodes.map((c) => {
+                        const code = cellValue(c, row);
+                        return code ? (
+                          <span key={c.key} className="block truncate font-mono text-[11px] text-text-secondary" title={`${c.label} ${code}`}>
+                            <span className="font-sans uppercase tracking-wide">{c.label}</span> {code}
+                          </span>
+                        ) : null;
+                      })}
+                    </span>
+                    <span className="flex flex-col items-end gap-1">
+                      {amount && <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{formatAmount(amount)}</span>}
+                      {listStatus && <Cell column={listStatus} row={row} variant="table" />}
+                      {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} />}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {/* Tablet and up: table */}
-        {table && filteredRows.length > 0 && (
+        {table && filteredRows.length > 0 && !compact && (
           <div ref={tableScrollRef} className="scrollbar-light hidden min-h-40 overflow-auto md:block md:flex-1">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">
@@ -1084,7 +1217,7 @@ export function ReportView({
                         "whitespace-nowrap px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary",
                         compact && "px-2",
                         column.kind === "amount" && "text-right",
-                        column.hideBelow && HIDE_BELOW[column.hideBelow],
+                        column.hideBelow && (compact ? HIDE_BELOW_PANEL : HIDE_BELOW)[column.hideBelow],
                       )}
                     >
                       {timeOnly && column.kind === "date" ? "Time" : columnTitle(column)}
@@ -1103,7 +1236,7 @@ export function ReportView({
                           compact && "px-2",
                           column.kind === "amount" && "whitespace-nowrap text-right",
                           (column.kind === "status" || column.kind === "entryType") && "whitespace-nowrap",
-                          column.hideBelow && HIDE_BELOW[column.hideBelow],
+                          column.hideBelow && (compact ? HIDE_BELOW_PANEL : HIDE_BELOW)[column.hideBelow],
                         )}
                       >
                         {ROW_REFRESH_ENABLED && section === "transfer" && column.label === "UTR" && isRefreshableTransfer(row) ? (

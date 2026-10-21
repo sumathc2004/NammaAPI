@@ -177,8 +177,11 @@ export const adminTransferColumns: ColumnSlot[] = [
     priority: 3,
     keys: [/^channel$/],
     sub: { label: "Shop", keys: [/^storename$/, /shop|store/] },
+    // In the compact panel these hide by the panel's width (container queries), so a narrow panel
+    // keeps Time, Beneficiary / Amount and Status (where the Dequeue/Refund actions live).
+    hideBelow: "xl",
   },
-  { id: "utr", label: "UTR", kind: "text", format: "code", priority: 4, keys: [/^utr$/] },
+  { id: "utr", label: "UTR", kind: "text", format: "code", priority: 4, keys: [/^utr$/], hideBelow: "lg" },
   { id: "status", label: "Status", kind: "status", priority: 5, keys: [/^txnstatus$/, /status/] },
 ];
 
