@@ -254,6 +254,13 @@ export async function fetchReport(
   // Field names only (no values), to help map columns in lib/reports/layouts.ts — logged in every
   // environment since the vendor has silently added/renamed fields in production before.
   console.info(`AEPS ${endpoint} fields: ${table.columns.join(", ")}`);
+  if (section === "bill-payments") {
+    // Counts only (no values): why Store / Vendor columns are hidden when the vendor leaves them blank.
+    const filled = (key: string) => rows.filter((row) => (row[key] ?? "").trim() !== "").length;
+    console.info(
+      `AEPS ${endpoint}: ${rows.length} rows; StoreName filled in ${filled("StoreName")}, VendorName filled in ${filled("VendorName")}`,
+    );
+  }
   if (section === "transfer" && rows[0]) {
     // Diagnosing the Dequeue action sending the wrong field as the row id: ids aren't sensitive
     // (unlike the account/UTR/mobile fields on the same row), so safe to log their values here.
