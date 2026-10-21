@@ -144,6 +144,12 @@ const REPORT_ENDPOINTS: Partial<Record<DashboardSectionId, ReportEndpoint>> = {
       delete next.fullCardNumber;
       // The biller's display name is often missing; fall back to its code.
       next.biller = (next.destNameForDisplay ?? "").trim() || (next.destAddress ?? "").trim();
+      // Store and vendor name in one column: the store name when there is one (with the vendor under
+      // it), otherwise the vendor alone — the vendor sends StoreName blank for many accounts.
+      const store = (next.StoreName ?? "").trim();
+      const vendor = (next.VendorName ?? "").trim();
+      next.shop = store || vendor;
+      next.shopVendor = store && vendor ? vendor : "";
       return next;
     },
   },

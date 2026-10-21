@@ -92,7 +92,7 @@ const pgColumns: ColumnSlot[] = [
 ];
 
 // Bill payments (APIClient/GetBillPaymentsDatewise): createdDatetime, billType (e.g. "CC Bill"),
-// StoreName and VendorName, MobileNumber, accountNO (last digits of the card/account; the full number
+// shop / shopVendor (built server-side from StoreName and VendorName, either of which can be blank), MobileNumber, accountNO (last digits of the card/account; the full number
 // is dropped server-side), biller (built server-side: destNameForDisplay, else the biller code
 // destAddress), billPaidRefNo, UniqueId, amount, billPaidStatus (SUCCESS/PENDING/…). username,
 // bpay_billFetchId, channel and Id are left out.
@@ -107,8 +107,8 @@ const billColumns: ColumnSlot[] = [
     label: "Store",
     kind: "text",
     priority: 3,
-    keys: [/^storename$/],
-    sub: { label: "Vendor", keys: [/^vendorname$/] },
+    keys: [/^shop$/],
+    sub: { label: "Vendor", keys: [/^shopvendor$/] },
     format: "words",
   },
   {
