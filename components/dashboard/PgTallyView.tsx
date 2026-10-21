@@ -395,7 +395,8 @@ export function PgTallyView() {
   return (
     <section aria-labelledby="pg-tally-title" className="@container flex min-w-0 flex-col gap-2 xl:h-full">
       {/* Title and totals (no dates: the tally always shows today). */}
-      <div className="flex min-w-0 items-center justify-between gap-2">
+      {/* Phones: the totals drop to their own line under the title instead of squeezing it. */}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <h2
           id="pg-tally-title"
           title="Card collections vs wallet credits (today)"
@@ -406,7 +407,7 @@ export function PgTallyView() {
         {ready && rows.length > 0 && (
           <dl
             title="Totals for today and the selected retailer"
-            className="flex min-w-0 items-center divide-x divide-brand-border text-xs"
+            className="ml-auto flex min-w-0 items-center divide-x divide-brand-border text-xs"
           >
             <div className="flex min-w-0 items-baseline gap-1.5 pr-2.5">
               <dt className="text-text-secondary">Collected</dt>
