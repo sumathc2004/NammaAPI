@@ -26,6 +26,8 @@ export type ColumnInfo = {
   /** A second field shown under the value (e.g. IFSC under the account number); its own column in CSV. */
   subKey?: string;
   subLabel?: string;
+  /** Header text shown instead of `label` (+ `subLabel`), e.g. "Store / Vendor" even when only one of the two has a value. CSV keeps label and subLabel. */
+  title?: string;
   /** How the second field is shown: "amount" formats it as ₹ (e.g. the amount under a beneficiary). */
   subKind?: "amount";
   /** "code": IDs and numbers, in monospace and never broken across lines. "words": wraps only between words. */
@@ -34,8 +36,9 @@ export type ColumnInfo = {
 
 export type TextFormat = "code" | "words";
 
-/** Header text: "Account / IFSC" for a column with a second field. */
-export const columnTitle = (column: ColumnInfo) => (column.subLabel ? `${column.label} / ${column.subLabel}` : column.label);
+/** Header text: "Account / IFSC" for a column with a second field (or the slot's fixed `title`). */
+export const columnTitle = (column: ColumnInfo) =>
+  column.title ?? (column.subLabel ? `${column.label} / ${column.subLabel}` : column.label);
 
 // Transfer-row flags: the vendor has sent the same concept under more than one field spelling
 // (CanRefund vs canbeRefund, dequeue vs AddToqueue vs dequeueEnable), so these match by the
@@ -354,6 +357,8 @@ export type ColumnSlot = {
   hideBelow?: "lg" | "xl" | "2xl";
   /** A second field shown under this one (e.g. IFSC under Account), matched like `keys`. */
   sub?: { label: string; keys: RegExp[]; kind?: "amount" };
+  /** Fixed header text, when the label alone would mislead if the second field is empty. */
+  title?: string;
   /** How text is set: see ColumnInfo["format"]. */
   format?: TextFormat;
 };
@@ -418,6 +423,7 @@ export function layoutColumns(table: ReportTable, slots: ColumnSlot[], minMatche
         ...(match.extraKey && { extraKey: match.extraKey }),
         ...(match.altKey && { altKey: match.altKey }),
         ...(slot.hideBelow && { hideBelow: slot.hideBelow }),
+        ...(slot.title && { title: slot.title }),
         ...(match.subKey && slot.sub && { subKey: match.subKey, subLabel: slot.sub.label }),
         ...(match.subKey && slot.sub?.kind && { subKind: slot.sub.kind }),
         ...(slot.format && { format: slot.format }),

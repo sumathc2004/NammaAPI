@@ -105,6 +105,7 @@ const billColumns: ColumnSlot[] = [
   {
     id: "store",
     label: "Store",
+    title: "Store / Vendor",
     kind: "text",
     priority: 3,
     keys: [/^shop$/],
