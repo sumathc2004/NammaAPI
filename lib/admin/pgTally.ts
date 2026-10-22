@@ -11,6 +11,11 @@ export type PgTallyRow = {
   userName: string;
   /** Retailer's name. */
   vendorName: string;
+  /**
+   * How the money is settled ("Wallet Instant", "Bank Account", …). Not in PgTallyReport: looked up from
+   * the PG Reports API (BpPayment/GetLinksByDate) by collection ID. Empty when that lookup fails.
+   */
+  settlementType: string;
   /** Charged to the customer's card. */
   debitFromCard: number;
   charges: number;

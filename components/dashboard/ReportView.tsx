@@ -236,9 +236,11 @@ type CardLayout = {
 function planCard(columns: ColumnInfo[], table: ReportTable | null): CardLayout {
   const rows = table?.rows ?? [];
   const isBalance = (c: ColumnInfo) => /balance|\bbal\b/i.test(c.label);
+  /** Charges / Fee columns are shown as a detail row, never as the card's headline amount. */
+  const isCharge = (c: ColumnInfo) => /charge|\bfee\b/i.test(c.label);
   const amount =
     columns.find((c) => c.kind === "amount" && (c.toneKey || c.altKey)) ??
-    columns.find((c) => c.kind === "amount" && !isBalance(c));
+    columns.find((c) => c.kind === "amount" && !isBalance(c) && !isCharge(c));
   const date = columns.find((c) => c.kind === "date");
   const badges = columns.filter((c) => c.kind === "entryType" || c.kind === "status");
 
@@ -886,7 +888,8 @@ export function ReportView({
   // whatever the panel's width. Where each goes is decided from the column kinds.
   const listDate = columns.find((c) => c.kind === "date");
   const listStatus = columns.find((c) => c.kind === "status");
-  const listAmount = columns.find((c) => c.kind === "amount");
+  const listCharge = columns.find((c) => c.kind === "amount" && /charge|\bfee\b/i.test(c.label));
+  const listAmount = columns.find((c) => c.kind === "amount" && c !== listCharge);
   const listTitle = columns.find((c) => c.kind === "text" && c.format !== "code");
   const listCodes = columns.filter((c) => c.kind === "text" && c.format === "code");
   const listDetails = columns.filter((c) => c.kind === "text" && c.format !== "code" && c !== listTitle);
@@ -1165,7 +1168,7 @@ export function ReportView({
                 return (
                   <li
                     key={currentPage * PAGE_SIZE + i}
-                    className="grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2 transition-colors hover:bg-brand-light/40"
+                    className="grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2 transition-colors hover:bg-brand-light/40"
                   >
                     <span className="whitespace-nowrap text-sm tabular-nums text-text-primary">{listTime(row)}</span>
                     <span className="min-w-0">
@@ -1190,6 +1193,11 @@ export function ReportView({
                     </span>
                     <span className="flex flex-col items-end gap-1">
                       {amount && <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{formatAmount(amount)}</span>}
+                      {listCharge && Number(cellValue(listCharge, row)) > 0 && (
+                        <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Transfer charges">
+                          Charges {formatAmount(cellValue(listCharge, row))}
+                        </span>
+                      )}
                       {listStatus && <Cell column={listStatus} row={row} variant="table" />}
                       {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} />}
                     </span>

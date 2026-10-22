@@ -47,7 +47,7 @@ const mobileNumberParams: ReportEndpoint["params"] = (credentials, fromDate, toD
 });
 
 /** "wallet_24Hours" → "Wallet 24 Hours" */
-function readableCode(value: string): string {
+export function readableCode(value: string): string {
   return value
     .replace(/_/g, " ")
     .replace(/(\d)([A-Za-z])/g, "$1 $2")
@@ -260,6 +260,14 @@ export async function fetchReport(
   // Field names only (no values), to help map columns in lib/reports/layouts.ts — logged in every
   // environment since the vendor has silently added/renamed fields in production before.
   console.info(`AEPS ${endpoint} fields: ${table.columns.join(", ")}`);
+  if (section === "transfer") {
+    // Numbers only: does the vendor's Fee (the transfer charge) come with values, and what do they look like.
+    const fees = rows.map((row) => (row.Fee ?? "").trim());
+    const nonZero = fees.filter((fee) => fee !== "" && Number(fee) !== 0);
+    console.info(
+      `AEPS ${endpoint}: ${rows.length} rows; Fee non-zero in ${nonZero.length}; distinct non-zero fees: ${[...new Set(nonZero)].slice(0, 6).join(", ") || "-"}`,
+    );
+  }
   if (section === "bill-payments") {
     // Counts only (no values): why Store / Vendor columns are hidden when the vendor leaves them blank.
     const filled = (key: string) => rows.filter((row) => (row[key] ?? "").trim() !== "").length;

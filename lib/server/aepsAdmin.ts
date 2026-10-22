@@ -5,6 +5,7 @@ import type { BpayStatusCheck, PgTallyRow } from "@/lib/admin/pgTally";
 import type { DaySummary } from "@/lib/admin/daySummary";
 import type { BulkpeEntry, BulkpeStatementPage } from "@/lib/admin/bulkpeStatement";
 import { REPORTS_START_DATE } from "@/lib/reports/dates";
+import { readableCode } from "@/lib/server/aepsReports";
 import type { SessionCredentials } from "@/lib/server/session";
 
 export type ApiBalanceResult = { ok: true; balance: ApiLevelBalance } | { ok: false; error: string };
@@ -74,6 +75,7 @@ export async function fetchPgTally(from: string, to: string): Promise<PgTallyRes
     referenceNumber: text(r.referenceNumber),
     userName: text(r.userName),
     vendorName: text(r.vendorName) || text(r.userName),
+    settlementType: "",
     debitFromCard: toNumber(r.DebitFromCard) ?? 0,
     charges: toNumber(r.Charges) ?? 0,
     amount: toNumber(r.Amount) ?? 0,
@@ -86,7 +88,92 @@ export async function fetchPgTally(from: string, to: string): Promise<PgTallyRes
         ? null
         : r.WalletCredited === true || /^(true|1|yes)$/i.test(text(r.WalletCredited)),
   }));
+  await addSettlementTypes(rows, from, to);
   return { ok: true, rows };
+}
+
+/** Per-retailer lookups of settlement types are limited: beyond this many retailers in one range, the rest are left blank. */
+const MAX_SETTLEMENT_LOOKUPS = 40;
+const SETTLEMENT_CONCURRENCY = 6;
+/** The tally reloads every 30s; a minute's cache stops each reload re-asking the vendor about every retailer. */
+const SETTLEMENT_TTL_MS = 45_000;
+const settlementCache = new Map<string, { at: number; types: Map<string, string> }>();
+
+/**
+ * One retailer's collections for the range, as collection ID → readable settlement type, or null when
+ * the vendor call fails. `fresh` skips the cache.
+ */
+async function settlementTypesFor(
+  userName: string,
+  from: string,
+  to: string,
+  fresh = false,
+): Promise<{ types: Map<string, string>; cached: boolean } | null> {
+  const key = `${userName}|${from}|${to}`;
+  const cached = settlementCache.get(key);
+  if (!fresh && cached && Date.now() - cached.at < SETTLEMENT_TTL_MS) return { types: cached.types, cached: true };
+
+  // Same call as PG Reports: GET BpPayment/GetLinksByDate?fromDate=&toDate=&mobileNumber= (no password).
+  const result = await aepsRequest(
+    "GetLinksByDate",
+    { fromDate: from, toDate: to, mobileNumber: userName },
+    { controller: "BpPayment", prefer: "json" },
+  );
+  if (!result.ok || !Array.isArray(result.body)) return null;
+
+  // Its referenceNumber ("BPPG…") is the tally's collection ID.
+  const types = new Map<string, string>();
+  for (const entry of result.body as Record<string, unknown>[]) {
+    const reference = text(entry.referenceNumber);
+    const type = text(entry.settlementType);
+    if (reference && type) types.set(reference, readableCode(type));
+  }
+  if (settlementCache.size > 200) settlementCache.delete(settlementCache.keys().next().value as string);
+  settlementCache.set(key, { at: Date.now(), types });
+  return { types, cached: false };
+}
+
+/** Runs `task` for every item, a few at a time. */
+async function inPool<T>(items: T[], task: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(SETTLEMENT_CONCURRENCY, items.length) }, async () => {
+      while (next < items.length) await task(items[next++]);
+    }),
+  );
+}
+
+/**
+ * Fills in `settlementType` on the tally rows. PgTallyReport doesn't carry it, so it comes from the
+ * PG Reports API, one call per retailer in the tally (parallel, a few at a time). Best effort: a failed
+ * lookup leaves that retailer's rows blank and never fails the tally. A collection that is newer than
+ * the cached lookup (it can show up in the tally a moment before its payment link) triggers one fresh
+ * lookup for its retailer, so new rows aren't blank for the cache's lifetime.
+ */
+async function addSettlementTypes(rows: PgTallyRow[], from: string, to: string): Promise<void> {
+  const retailers = [...new Set(rows.map((row) => row.userName).filter(Boolean))];
+  if (retailers.length === 0) return;
+  if (retailers.length > MAX_SETTLEMENT_LOOKUPS) {
+    console.warn(`AEPS PgTallyReport: ${retailers.length} retailers; settlement types looked up for the first ${MAX_SETTLEMENT_LOOKUPS} only.`);
+  }
+
+  const lookups = retailers.slice(0, MAX_SETTLEMENT_LOOKUPS);
+  const byRetailer = new Map<string, { types: Map<string, string>; cached: boolean } | null>();
+  await inPool(lookups, async (userName) => {
+    byRetailer.set(userName, await settlementTypesFor(userName, from, to));
+  });
+
+  // Rows the cached lookup didn't know yet (a collection with no ID yet can't be matched, so it doesn't count): ask the vendor again for those retailers.
+  const stale = lookups.filter(
+    (userName) => byRetailer.get(userName)?.cached && rows.some((row) => row.userName === userName && row.collectionId && !byRetailer.get(userName)?.types.has(row.collectionId)),
+  );
+  await inPool(stale, async (userName) => {
+    byRetailer.set(userName, await settlementTypesFor(userName, from, to, true));
+  });
+
+  for (const row of rows) {
+    row.settlementType = byRetailer.get(row.userName)?.types.get(row.collectionId) ?? "";
+  }
 }
 
 export type BpayStatusResult = { ok: true; check: BpayStatusCheck } | { ok: false; error: string };

@@ -149,6 +149,8 @@ const transferColumns: ColumnSlot[] = [
     hideBelow: "xl",
   },
   { id: "amount", label: "Amount", kind: "amount", priority: 6, keys: [/^amount$/] },
+  // The transfer's charge: the vendor's Fee field.
+  { id: "charges", label: "Charges", kind: "amount", priority: 10, keys: [/^fee$/, /charge/], hideBelow: "lg" },
   { id: "utr", label: "UTR", kind: "text", format: "code", priority: 7, keys: [/^utr$/], hideBelow: "xl" },
   { id: "status", label: "Status", kind: "status", priority: 8, keys: [/^txnstatus$/, /status/] },
   { id: "remarks", label: "Remarks", kind: "text", format: "words", priority: 9, keys: [/^remarks?$/], hideBelow: "2xl" },
@@ -181,6 +183,8 @@ export const adminTransferColumns: ColumnSlot[] = [
     // keeps Time, Beneficiary / Amount and Status (where the Dequeue/Refund actions live).
     hideBelow: "xl",
   },
+  // Shown under the amount in the compact list (and as a Charges row on phone cards).
+  { id: "charges", label: "Charges", kind: "amount", priority: 10, keys: [/^fee$/, /charge/], hideBelow: "xl" },
   { id: "utr", label: "UTR", kind: "text", format: "code", priority: 4, keys: [/^utr$/], hideBelow: "lg" },
   { id: "status", label: "Status", kind: "status", priority: 5, keys: [/^txnstatus$/, /status/] },
 ];

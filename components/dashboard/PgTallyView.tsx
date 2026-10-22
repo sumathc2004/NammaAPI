@@ -265,11 +265,12 @@ function TallyRow({
   const issue = isTallyIssue(tallyCheck(row));
   const showWallet = !(row.canRefresh && !WALLET[tallyCheck(row)]);
   const canCheck = row.canRefresh && !!row.referenceNumber && !!row.collectionId;
+  const showMobile = !!row.userName && row.userName !== row.vendorName;
   const refs = [row.referenceNumber, row.collectionId !== row.referenceNumber ? row.collectionId : ""].filter(Boolean);
   return (
     <li
       className={cn(
-        "grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2",
+        "grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2",
         issue && "bg-status-failed-bg/40",
         className,
       )}
@@ -284,8 +285,12 @@ function TallyRow({
         <span className="block truncate text-sm font-medium text-text-primary" title={row.vendorName}>
           {row.vendorName}
         </span>
-        {row.userName && row.userName !== row.vendorName && (
-          <span className="block font-mono text-[11px] text-text-secondary">{row.userName}</span>
+        {(showMobile || row.settlementType) && (
+          <span className="block text-[11px] text-text-secondary">
+            {showMobile && <span className="font-mono">{row.userName}</span>}
+            {showMobile && row.settlementType && " · "}
+            {row.settlementType && <span title="Settlement type">{row.settlementType}</span>}
+          </span>
         )}
         <span className="block font-mono text-[11px] text-text-secondary wrap-anywhere">{refs.join(" · ")}</span>
       </span>
@@ -378,7 +383,7 @@ export function PgTallyView() {
       .filter(
         (r) =>
           !needle ||
-          [r.vendorName, r.userName, r.referenceNumber, r.collectionId, String(r.amount), String(r.debitFromCard)].some((v) =>
+          [r.vendorName, r.userName, r.referenceNumber, r.collectionId, r.settlementType, String(r.amount), String(r.debitFromCard)].some((v) =>
             v.toLowerCase().includes(needle),
           ),
       )
@@ -527,6 +532,9 @@ export function PgTallyView() {
                     <th scope="col" className="hidden px-2 py-2 @5xl:px-3 @5xl:table-cell">
                       Reference / Collection ID
                     </th>
+                    <th scope="col" className="hidden whitespace-nowrap px-2 py-2 @5xl:px-3 @5xl:table-cell">
+                      Settlement
+                    </th>
                     <th scope="col" className="hidden px-2 py-2 @5xl:px-3 text-right @6xl:table-cell">
                       Card amount
                     </th>
@@ -569,12 +577,16 @@ export function PgTallyView() {
                           {row.userName && row.userName !== row.vendorName && (
                             <span className="block font-mono text-xs text-text-secondary">{row.userName}</span>
                           )}
+                          {row.settlementType && <span className="block text-xs text-text-secondary @5xl:hidden">{row.settlementType}</span>}
                         </td>
                         <td className="hidden whitespace-nowrap px-2 py-2 @5xl:px-3 font-mono @5xl:table-cell">
                           <span className="block text-xs text-text-primary">{row.referenceNumber || "—"}</span>
                           {row.collectionId && row.collectionId !== row.referenceNumber && (
                             <span className="block text-[11px] text-text-secondary">{row.collectionId}</span>
                           )}
+                        </td>
+                        <td className="hidden whitespace-nowrap px-2 py-2 @5xl:px-3 text-xs text-text-primary @5xl:table-cell">
+                          {row.settlementType || <span className="text-text-secondary">—</span>}
                         </td>
                         <td className="hidden whitespace-nowrap px-2 py-2 @5xl:px-3 text-right tabular-nums text-text-primary @6xl:table-cell">
                           {inr(row.debitFromCard)}

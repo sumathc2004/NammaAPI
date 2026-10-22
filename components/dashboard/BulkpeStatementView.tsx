@@ -149,7 +149,7 @@ function EntryRow({
         onClick={onToggle}
         aria-expanded={open}
         // Phones (panel narrower than @md): no direction icon column, so the name gets the room.
-        className="grid w-full grid-cols-[3.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2.5 text-left transition-colors hover:bg-brand-light/50 @md:grid-cols-[3.25rem_1.75rem_minmax(0,1fr)_auto]"
+        className="grid w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2.5 text-left transition-colors hover:bg-brand-light/50 @md:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
       >
         <span className="tabular-nums">
           {!isToday && <span className="block text-[11px] text-text-secondary">{day}</span>}
