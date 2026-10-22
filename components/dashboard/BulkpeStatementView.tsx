@@ -211,6 +211,15 @@ function EntryRow({
               Bal {inr(entry.closingBalance)}
             </span>
           )}
+          {/* The payout's charge (money in has none); the GST on it is in the tooltip and the details. */}
+          {entry.charge > 0 && (
+            <span
+              className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
+              title={`Charge ${inr(entry.charge)} + GST ${inr(entry.gst)}`}
+            >
+              Charges {inr(entry.charge)}
+            </span>
+          )}
           <StatusBadge status={entry.status} />
         </span>
       </button>
