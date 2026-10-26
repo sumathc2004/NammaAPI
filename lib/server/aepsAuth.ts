@@ -74,6 +74,8 @@ export async function requestAepsOtp(phone: string, password: string): Promise<A
       .filter(([key]) => /^(is|can)/i.test(key) || /admin|accountant|access/i.test(key))
       .map(([key, value]) => `${key}=${typeof value === "boolean" || typeof value === "number" ? value : JSON.stringify(text(value))}`);
     console.log(`AEPS login role flags: ${flags.join(", ") || "(none in the response)"}`);
+    // Field names only, no values: which identity/parent/client fields does the login response carry?
+    console.log(`AEPS login fields: ${Object.keys(root).join(", ")}`);
   }
 
   if (message !== "Success") {

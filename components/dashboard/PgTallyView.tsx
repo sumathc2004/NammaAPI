@@ -352,14 +352,14 @@ export function PgTallyView() {
   // Status check for one collection (vendor CanRefresh). The tally reloads quietly afterwards.
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
   const checking = checkResult?.status === "pending";
-  async function checkStatus(reference: string, collectionId: string) {
+  async function checkStatus(reference: string, collectionId: string, createdDateTime: string) {
     if (checking) return;
     setCheckResult({ status: "pending", reference });
     try {
       const response = await fetch("/api/dashboard/admin/pg-tally/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ referenceNumber: reference, collectionId }),
+        body: JSON.stringify({ referenceNumber: reference, collectionId, date: createdDateTime.slice(0, 10) }),
       });
       const data = await response.json().catch(() => null);
       if (response.ok && data?.check) setCheckResult({ status: "ok", reference, check: data.check });
@@ -608,7 +608,7 @@ export function PgTallyView() {
 <span className="flex items-center gap-2">
                             {!(row.canRefresh && !WALLET[tallyCheck(row)]) && <WalletBadge row={row} />}
                             {row.canRefresh && row.referenceNumber && row.collectionId && (
-                              <RefreshButton busy={checking && checkResult?.reference === row.referenceNumber} onClick={() => checkStatus(row.referenceNumber, row.collectionId)} />
+                              <RefreshButton busy={checking && checkResult?.reference === row.referenceNumber} onClick={() => checkStatus(row.referenceNumber, row.collectionId, row.createdDateTime)} />
                             )}
                           </span>
                         </td>
@@ -627,7 +627,7 @@ export function PgTallyView() {
                   row={row}
                   timeOnly={timeOnly}
                   checking={checking && checkResult?.reference === row.referenceNumber}
-                  onCheck={() => checkStatus(row.referenceNumber, row.collectionId)}
+                  onCheck={() => checkStatus(row.referenceNumber, row.collectionId, row.createdDateTime)}
                   // Phones: 30 rows at a time (the list scrolls with the page); tablet and up: all of them, scrolling inside.
                   className={cn(i >= mobileLimit && "hidden md:grid")}
                 />

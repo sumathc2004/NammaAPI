@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
-import { checkBpayStatus } from "@/lib/server/aepsAdmin";
+import { checkBpayStatus, fetchPgTally } from "@/lib/server/aepsAdmin";
 import { getSessionCredentials } from "@/lib/server/session";
-import { adminAccess } from "@/lib/auth/adminAccess";
+import { tallyScope } from "@/lib/auth/adminAccess";
+import { validateRange } from "@/lib/reports/dates";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const RATE_LIMIT = { limit: 30, windowMs: 10 * 60 * 1000 };
 const REFERENCE_PATTERN = /^[A-Za-z0-9-]{4,40}$/;
 
-/** POST /api/dashboard/admin/pg-tally/refresh { referenceNumber, collectionId } → vendor bpayStatusCheck_admin. Admins only. */
+/**
+ * POST /api/dashboard/admin/pg-tally/refresh { referenceNumber, collectionId, date } → vendor
+ * bpayStatusCheck_admin. Admins may check any collection; every other login only its own retailer's
+ * (checked against that day's tally), because the vendor call itself takes no credentials.
+ */
 export async function POST(request: Request) {
   const rate = checkRateLimit(`admin-pg-refresh:${getClientIp(request)}`, RATE_LIMIT);
   if (rate.limited) {
@@ -21,10 +26,6 @@ export async function POST(request: Request) {
   if (!credentials) {
     return NextResponse.json({ error: "Your session has expired. Please log in again." }, { status: 401 });
   }
-  // The trustworthy admin check: from the encrypted session cookie, never from the browser.
-  if (adminAccess(credentials) === "none") {
-    return NextResponse.json({ error: "This is only available to administrators, accountants and super access." }, { status: 403 });
-  }
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const field = (key: string) => (typeof body?.[key] === "string" ? (body[key] as string).trim() : "");
@@ -32,6 +33,19 @@ export async function POST(request: Request) {
   const collectionId = field("collectionId");
   if (!REFERENCE_PATTERN.test(referenceNumber) || !REFERENCE_PATTERN.test(collectionId)) {
     return NextResponse.json({ error: "Missing or invalid reference number or collection ID." }, { status: 400 });
+  }
+
+  // Not an admin: the collection must be one of the caller's own (looked up in that day's tally).
+  if (tallyScope(credentials) !== "all") {
+    const date = field("date");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || validateRange(date, date, "pg-reports")) {
+      return NextResponse.json({ error: "Missing or invalid date." }, { status: 400 });
+    }
+    const own = await fetchPgTally(date, date, credentials.userName);
+    if (!own.ok) return NextResponse.json({ error: own.error }, { status: 502 });
+    if (!own.rows.some((row) => row.referenceNumber === referenceNumber && row.collectionId === collectionId)) {
+      return NextResponse.json({ error: "That collection isn't yours." }, { status: 403 });
+    }
   }
 
   // The vendor calls the collection ID "pgOrderId".

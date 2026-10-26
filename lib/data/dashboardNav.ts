@@ -15,6 +15,12 @@ export const dashboardSections = [
     description: "Payment gateway collections and settlement reports.",
   },
   {
+    id: "pg-tally",
+    label: "PG Tally",
+    description: "Your card collections and whether each one reached your wallet.",
+    role: "retailer",
+  },
+  {
     id: "aeps-reports",
     label: "AEPS Reports",
     description: "Aadhaar-enabled payment transactions such as cash withdrawals and balance enquiries.",

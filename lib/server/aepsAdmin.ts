@@ -59,9 +59,9 @@ const text = (value: unknown) => (typeof value === "string" ? value.trim() : typ
  * one row per card collection: { createdDateTime, collectionId, referenceNumber, userName, vendorName,
  * Amount, DebitFromCard, Charges, collectionStatus, PaymentStatus, WalletTxnStatus, WalletCreditTime,
  * WalletClosingTime, WalletClosingBalance, WalletCreditCount, CanRefresh }. Needs no credentials, so
- * none are sent; the route in front of it is what restricts it to admins.
+ * none are sent; the route in front of it decides who gets which rows (`owner`: see tallyScope()).
  */
-export async function fetchPgTally(from: string, to: string): Promise<PgTallyResult> {
+export async function fetchPgTally(from: string, to: string, owner?: string): Promise<PgTallyResult> {
   const result = await aepsRequest("PgTallyReport", { from, to }, { method: "POST", prefer: "json" });
   if (!result.ok) return result;
   if (!Array.isArray(result.body)) {
@@ -88,8 +88,11 @@ export async function fetchPgTally(from: string, to: string): Promise<PgTallyRes
         ? null
         : r.WalletCredited === true || /^(true|1|yes)$/i.test(text(r.WalletCredited)),
   }));
-  await addSettlementTypes(rows, from, to);
-  return { ok: true, rows };
+  // The vendor returns every retailer. `owner` (the caller's own login number) keeps only that retailer's
+  // rows, before anything else is looked up for them; admins pass nothing and get all of them.
+  const visible = owner ? rows.filter((row) => row.userName === owner) : rows;
+  await addSettlementTypes(visible, from, to);
+  return { ok: true, rows: visible };
 }
 
 /** Per-retailer lookups of settlement types are limited: beyond this many retailers in one range, the rest are left blank. */

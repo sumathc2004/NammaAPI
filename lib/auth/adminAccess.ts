@@ -7,14 +7,29 @@ export type AdminFlags = { isAdmin?: boolean; isAccountant?: boolean; isSuperAcc
 
 /** The role-only sidebar pages. */
 /** `adminOrAccountant` is for pages both of those roles share (Filing). */
-export type PageRole = "admin" | "accountant" | "adminOrAccountant" | "superAccess";
+/** `retailer` is a plain login: none of the three flags (it sees the pages everyone sees, plus its own PG Tally). */
+export type PageRole = "admin" | "accountant" | "adminOrAccountant" | "superAccess" | "retailer";
 
 /** Whether the account has the flag a role-only page needs. */
 export function hasPageRole(flags: AdminFlags | null | undefined, role: PageRole): boolean {
   if (role === "admin") return flags?.isAdmin === true;
   if (role === "accountant") return flags?.isAccountant === true;
   if (role === "adminOrAccountant") return flags?.isAdmin === true || flags?.isAccountant === true;
+  if (role === "retailer") return flags?.isAdmin !== true && flags?.isAccountant !== true && flags?.isSuperAccess !== true;
   return flags?.isSuperAccess === true;
+}
+
+/**
+ * Which PG tally collections an account may see:
+ * - `all`: admins — every retailer on the platform.
+ * - `own`: everyone else (accountants, super access, retailers) — only the collections of the retailer
+ *   whose login number is the account's own. The vendor's PgTallyReport has no per-client filter and
+ *   returns the whole platform, so this is enforced by our server (see the pg-tally routes).
+ */
+export type TallyScope = "all" | "own";
+
+export function tallyScope(flags: AdminFlags | null | undefined): TallyScope {
+  return flags?.isAdmin === true ? "all" : "own";
 }
 
 /**
