@@ -75,7 +75,11 @@ export async function requestAepsOtp(phone: string, password: string): Promise<A
       .map(([key, value]) => `${key}=${typeof value === "boolean" || typeof value === "number" ? value : JSON.stringify(text(value))}`);
     console.log(`AEPS login role flags: ${flags.join(", ") || "(none in the response)"}`);
     // Field names only, no values: which identity/parent/client fields does the login response carry?
-    console.log(`AEPS login fields: ${Object.keys(root).join(", ")}`);
+    // Lists and objects are marked with their size (a retailer list would show up as e.g. "Retailers:array(5)").
+    const shape = Object.entries(root).map(([key, value]) =>
+      Array.isArray(value) ? `${key}:array(${value.length})` : value && typeof value === "object" ? `${key}:object(${Object.keys(value).length})` : key,
+    );
+    console.log(`AEPS login fields: ${shape.join(", ")}`);
   }
 
   if (message !== "Success") {
