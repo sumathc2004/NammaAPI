@@ -10,8 +10,8 @@ const REFERENCE_PATTERN = /^[A-Za-z0-9-]{4,40}$/;
 
 /**
  * POST /api/dashboard/admin/pg-tally/refresh { referenceNumber, collectionId, date } → vendor
- * bpayStatusCheck_admin. Admins may check any collection; every other login only its own retailer's
- * (checked against that day's tally), because the vendor call itself takes no credentials.
+ * bpayStatusCheck_admin. Admins and accountants may check any collection; super access only its own
+ * retailer's (checked against that day's tally), retailers none — the vendor call itself takes no credentials.
  */
 export async function POST(request: Request) {
   const rate = checkRateLimit(`admin-pg-refresh:${getClientIp(request)}`, RATE_LIMIT);
@@ -27,6 +27,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Your session has expired. Please log in again." }, { status: 401 });
   }
 
+  const scope = tallyScope(credentials);
+  if (scope === "none") {
+    return NextResponse.json({ error: "This is only available to administrators, accountants and super access." }, { status: 403 });
+  }
+
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const field = (key: string) => (typeof body?.[key] === "string" ? (body[key] as string).trim() : "");
   const referenceNumber = field("referenceNumber");
@@ -35,8 +40,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing or invalid reference number or collection ID." }, { status: 400 });
   }
 
-  // Not an admin: the collection must be one of the caller's own (looked up in that day's tally).
-  if (tallyScope(credentials) !== "all") {
+  // Super access: the collection must be one of the caller's own (looked up in that day's tally).
+  if (scope === "own") {
     const date = field("date");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || validateRange(date, date, "pg-reports")) {
       return NextResponse.json({ error: "Missing or invalid date." }, { status: 400 });

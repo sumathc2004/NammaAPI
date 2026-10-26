@@ -15,12 +15,6 @@ const paths = {
       <path d="M3 10h18M7 14.5h4" />
     </>
   ),
-  "pg-tally": (
-    <>
-      <rect x="3" y="5.5" width="18" height="13" rx="2" />
-      <path d="M8 12.2l2.6 2.6L16 9.4" />
-    </>
-  ),
   "aeps-reports": (
     <>
       <path d="M12 11.5v2.5a7 7 0 0 1-1.4 4.2" />

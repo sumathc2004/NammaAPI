@@ -9,8 +9,8 @@ const RATE_LIMIT = { limit: 60, windowMs: 10 * 60 * 1000 };
 
 /**
  * GET /api/dashboard/admin/pg-tally?fromDate=&toDate= → vendor PgTallyReport, scoped by who is asking:
- * admins get every retailer's collections; every other login (accountant, super access, retailer) gets
- * only its own retailer's rows. The vendor can't filter, so the filtering happens here, from the session.
+ * admins and accountants get every retailer's collections, super access only its own retailer's rows,
+ * retailers nothing (403). The vendor can't filter, so the filtering happens here, from the session.
  */
 export async function GET(request: Request) {
   const rate = checkRateLimit(`admin-pg-tally:${getClientIp(request)}`, RATE_LIMIT);
@@ -26,7 +26,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Your session has expired. Please log in again." }, { status: 401 });
   }
   // The scope comes from the encrypted session cookie, never from the browser.
-  const owner = tallyScope(credentials) === "all" ? undefined : credentials.userName;
+  const scope = tallyScope(credentials);
+  if (scope === "none") {
+    return NextResponse.json({ error: "This is only available to administrators, accountants and super access." }, { status: 403 });
+  }
+  const owner = scope === "all" ? undefined : credentials.userName;
 
   const params = new URL(request.url).searchParams;
   const today = todayInIndia();

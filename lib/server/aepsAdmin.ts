@@ -62,7 +62,9 @@ const text = (value: unknown) => (typeof value === "string" ? value.trim() : typ
  * none are sent; the route in front of it decides who gets which rows (`owner`: see tallyScope()).
  */
 export async function fetchPgTally(from: string, to: string, owner?: string): Promise<PgTallyResult> {
-  const result = await aepsRequest("PgTallyReport", { from, to }, { method: "POST", prefer: "json" });
+  let result = await aepsRequest("PgTallyReport", { from, to }, { method: "POST", prefer: "json" });
+  // The vendor's database now and then picks this report as a deadlock victim ("rerun the transaction"): once more.
+  if (!result.ok) result = await aepsRequest("PgTallyReport", { from, to }, { method: "POST", prefer: "json" });
   if (!result.ok) return result;
   if (!Array.isArray(result.body)) {
     console.error("AEPS PgTallyReport did not return a list.");
