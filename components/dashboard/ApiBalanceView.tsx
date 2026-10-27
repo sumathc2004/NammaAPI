@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { isBulAccount, type ApiLevelBalance } from "@/lib/admin/apiBalance";
 import { cn } from "@/lib/cn";
+import { parseDemoSession, readDemoSessionRaw, subscribeDemoSession } from "@/lib/auth/demoSession";
 
 type LoadState =
   | { status: "loading" }
@@ -102,6 +103,15 @@ export function ApiBalanceView({ bulOnly = false, extra }: { bulOnly?: boolean; 
     return () => clearInterval(interval);
   }, []);
 
+  // Super access: the account's own debit (wallet) balance — the login's `walletBalance`, the same figure as the
+  // navbar's "Debit balance". The vendor has no live balance endpoint, so it only changes at the next login.
+  const rawProfile = useSyncExternalStore(subscribeDemoSession, readDemoSessionRaw, () => undefined);
+  const debitBalance = useMemo(() => {
+    const value = parseDemoSession(rawProfile)?.walletBalance;
+    const amount = Number((value ?? "").replace(/,/g, ""));
+    return value && Number.isFinite(amount) ? amount : null;
+  }, [rawProfile]);
+
   function refresh() {
     setState({ status: "loading" });
     setReloadKey((k) => k + 1);
@@ -117,6 +127,8 @@ export function ApiBalanceView({ bulOnly = false, extra }: { bulOnly?: boolean; 
     : [];
   const shareOfAll = (amount: number) => (accountsTotal > 0 ? (amount / accountsTotal) * 100 : 0);
   const bulTotal = round2(bulAccounts.reduce((sum, a) => sum + a.amount, 0));
+  /** Super access: debit balance − BUL total (null until the debit balance is known). */
+  const debitMinusBul = debitBalance !== null ? round2(debitBalance - bulTotal) : null;
   const diffMatches = balance?.diff != null && round2(balance.wallet - accountsTotal) === round2(balance.diff);
 
   return (
@@ -203,6 +215,18 @@ export function ApiBalanceView({ bulOnly = false, extra }: { bulOnly?: boolean; 
 
           </>)}
 
+          {/* Super access: the first box is its own debit balance. Full width on phones, as wide as its content from sm. */}
+          {bulOnly && (
+            <div
+              className="basis-full rounded-xl border border-brand-border bg-white px-3 py-2 sm:min-w-36 sm:flex-none sm:basis-auto min-[1680px]:px-4"
+              title="Your wallet balance as of your last login — the same figure as the navbar"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Debit balance</p>
+              <p className="mt-0.5 text-base font-bold tabular-nums text-text-primary">{debitBalance !== null ? inr(debitBalance) : "—"}</p>
+              <p className="text-[11px] text-text-secondary">Wallet balance</p>
+            </div>
+          )}
+
           {bulAccounts.length > 0 && (
             <div className="flex flex-auto flex-wrap gap-x-2.5 gap-y-2 rounded-xl border border-brand-border bg-white px-3 py-2 min-[1680px]:gap-x-4 min-[1680px]:px-4">
               <div className="w-full sm:w-auto">
@@ -226,6 +250,27 @@ export function ApiBalanceView({ bulOnly = false, extra }: { bulOnly?: boolean; 
                   <ShareBar share={bulTotal > 0 ? (account.amount / bulTotal) * 100 : 0} />
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Super access: the last box is the difference between its debit balance and the BUL total (blue, like the admin's Difference). */}
+          {bulOnly && bulAccounts.length > 0 && (
+            <div
+              className="basis-full rounded-xl bg-brand-gradient px-3 py-2 text-white shadow-lg shadow-brand-primary/20 sm:min-w-40 sm:flex-none sm:basis-auto min-[1680px]:px-4"
+              title="Debit balance − BUL total"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/75">Difference</p>
+                {debitMinusBul === 0 && (
+                  <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[11px] font-semibold text-white" title="Debit balance equals the BUL total">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-lg font-bold leading-snug tabular-nums tracking-tight">
+                {debitMinusBul !== null ? inr(debitMinusBul) : "—"}
+              </p>
+              <p className="text-[11px] text-white/70">Debit balance − BUL total</p>
             </div>
           )}
 
