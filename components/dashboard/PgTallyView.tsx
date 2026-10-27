@@ -21,7 +21,11 @@ const AUTO_REFRESH_MS = 30_000;
 const MOBILE_PAGE = 30;
 
 type Range = { from: string; to: string };
-type LoadState = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; rows: PgTallyRow[] };
+type LoadState =
+  | { status: "loading" }
+  /** `retryable`: a server or network failure (worth trying again), not "session expired" or a bad request. */
+  | { status: "error"; message: string; retryable?: boolean }
+  | { status: "ready"; rows: PgTallyRow[] };
 
 async function loadTally(range: Range): Promise<LoadState> {
   try {
@@ -29,12 +33,26 @@ async function loadTally(range: Range): Promise<LoadState> {
     const response = await fetch(`/api/dashboard/admin/pg-tally?${query}`, { cache: "no-store" });
     const data = await response.json().catch(() => null);
     if (!response.ok || !Array.isArray(data?.rows)) {
-      return { status: "error", message: data?.error || "We couldn't load the PG tally. Please try again." };
+      return { status: "error", message: data?.error || "We couldn't load the PG tally. Please try again.", retryable: response.status >= 500 };
     }
     return { status: "ready", rows: data.rows };
   } catch {
-    return { status: "error", message: "Network error. Check your connection and try again." };
+    return { status: "error", message: "Network error. Check your connection and try again.", retryable: true };
   }
+}
+
+/**
+ * The vendor's database now and then fails this report with a deadlock ("rerun the transaction") — about
+ * one call in four — and the server already tries twice. So a failed load is tried again a couple more
+ * times, a moment apart, before the error is shown. Only for server/network failures.
+ */
+async function loadTallyWithRetry(range: Range, attempts = 3): Promise<LoadState> {
+  let result = await loadTally(range);
+  for (let i = 1; i < attempts && result.status === "error" && result.retryable; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    result = await loadTally(range);
+  }
+  return result;
 }
 
 const inr = (amount: number) => amount.toLocaleString("en-IN", { style: "currency", currency: "INR" });
@@ -321,7 +339,7 @@ export function PgTallyView() {
 
   useEffect(() => {
     let cancelled = false;
-    loadTally(range).then((next) => {
+    loadTallyWithRetry(range).then((next) => {
       if (!cancelled) setState(next);
     });
     return () => {
@@ -329,7 +347,8 @@ export function PgTallyView() {
     };
   }, [range]);
 
-  // Quiet reload every 30s (no loading state); skips while the tab is hidden or the last load failed.
+  // Quiet reload every 30s (no loading state); skips while the tab is hidden or a load is still running.
+  // After a failed load it keeps trying (a few quick retries each time) and clears the error as soon as it works.
   const statusRef = useRef(state.status);
   useEffect(() => {
     statusRef.current = state.status;
@@ -342,8 +361,8 @@ export function PgTallyView() {
         setRange({ from: now, to: now });
         return;
       }
-      if (document.hidden || statusRef.current !== "ready") return;
-      const next = await loadTally(range);
+      if (document.hidden || statusRef.current === "loading") return;
+      const next = statusRef.current === "error" ? await loadTallyWithRetry(range, 2) : await loadTally(range);
       if (next.status === "ready") setState(next);
     }, AUTO_REFRESH_MS);
     return () => clearInterval(interval);
