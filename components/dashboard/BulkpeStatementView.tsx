@@ -229,6 +229,9 @@ function EntryRow({
   );
 }
 
+/** Lower-cases and drops spaces, underscores, hyphens and commas, so a search matches however it is typed. */
+const squash = (text: string) => text.toLowerCase().replace(/[\s_,-]+/g, "");
+
 const inputClasses =
   "h-9 rounded-lg border border-brand-border bg-white px-2.5 text-sm text-text-primary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/15";
 
@@ -298,14 +301,16 @@ export function BulkpeStatementView() {
 
   const view = VIEWS.find((v) => v.id === viewId) ?? VIEWS[0];
   const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    // Case, spaces, underscores, hyphens and commas don't matter: "bul6752", "BUL_6752", "bul 6752" and
+    // "6752" (the vendor's token) all find BUL 6752, and "44,095" finds ₹44,095.
+    const needle = squash(query);
     return entries
       .filter(view.match)
       .filter(
         (e) =>
           !needle ||
           [e.beneficiaryName, e.holderName, e.reference, e.id, e.utr, e.account, e.ifsc, e.bulAccount, String(e.amount)].some((v) =>
-            v.toLowerCase().includes(needle),
+            squash(v).includes(needle),
           ),
       );
   }, [entries, view, query]);
@@ -391,7 +396,7 @@ export function BulkpeStatementView() {
                 setQuery(e.target.value);
                 setMobileLimit(MOBILE_PAGE);
               }}
-              placeholder="Search name, UTR, reference…"
+              placeholder="Search name, UTR, BUL…"
               disabled={!ready || entries.length === 0}
               className={cn(inputClasses, "w-full pl-9 disabled:bg-brand-light/50")}
             />

@@ -36,6 +36,13 @@ const PAGE_SIZE = 50;
 /** How often an open report quietly re-loads itself. */
 const AUTO_REFRESH_MS = 30_000;
 
+/**
+ * Vendor fields a report's search also looks in, besides the columns on screen (matched by the field's
+ * name with case and separators ignored). Transfer: the store name — a column only in the admin panel
+ * (under the vendor), not on the full page, but people search by it.
+ */
+const EXTRA_SEARCH_FIELDS: Partial<Record<DashboardSectionId, RegExp>> = { transfer: /^storename$/ };
+
 /** Per-row Refresh button in the UTR column (Transfer). Switched off for now; flip to true to bring it back. */
 const ROW_REFRESH_ENABLED = false;
 
@@ -816,8 +823,10 @@ export function ReportView({
     const needle = query.trim().toLowerCase();
     if (!needle) return viewRows;
     const matches = (row: ReportRow, key?: string) => !!key && (row[key] ?? "").toLowerCase().includes(needle);
-    return viewRows.filter((row) => columns.some((c) => matches(row, c.key) || matches(row, c.subKey)));
-  }, [viewRows, columns, query]);
+    const extraPattern = EXTRA_SEARCH_FIELDS[section];
+    const extraKeys = extraPattern && table ? table.columns.filter((key) => extraPattern.test(key.toLowerCase().replace(/[^a-z0-9]/g, ""))) : [];
+    return viewRows.filter((row) => columns.some((c) => matches(row, c.key) || matches(row, c.subKey)) || extraKeys.some((key) => matches(row, key)));
+  }, [viewRows, columns, query, section, table]);
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
