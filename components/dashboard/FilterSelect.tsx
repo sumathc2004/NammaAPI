@@ -9,6 +9,8 @@ export type FilterOption = {
   count?: number | null;
   /** Needs attention when its count is above zero (e.g. "To check", "Failed"). */
   alert?: boolean;
+  /** Heading of a group of options (consecutive options with the same `group` share one heading). */
+  group?: string;
 };
 
 /**
@@ -38,6 +40,20 @@ export function FilterSelect({
   const hasAlert = (option: FilterOption | undefined) => !!option?.alert && (option.count ?? 0) > 0;
   const unseenAlert = !hasAlert(current) && options.some(hasAlert);
 
+  const renderOption = (option: FilterOption) => (
+    <option key={option.id} value={option.id}>
+      {option.label}
+      {option.count != null ? ` (${option.count.toLocaleString("en-IN")})` : ""}
+    </option>
+  );
+  // Consecutive options with the same `group` go under one <optgroup> heading; the rest stay plain.
+  const sections: { group?: string; options: FilterOption[] }[] = [];
+  for (const option of options) {
+    const last = sections[sections.length - 1];
+    if (last && last.group === option.group) last.options.push(option);
+    else sections.push({ group: option.group, options: [option] });
+  }
+
   return (
     <div className={cn("relative", className)}>
       <label htmlFor={id} className="sr-only">
@@ -54,12 +70,15 @@ export function FilterSelect({
           hasAlert(current) ? "border-status-failed/60 text-status-failed" : "border-brand-border text-text-primary",
         )}
       >
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-            {option.count != null ? ` (${option.count.toLocaleString("en-IN")})` : ""}
-          </option>
-        ))}
+        {sections.map((section, i) =>
+          section.group ? (
+            <optgroup key={`${section.group}-${i}`} label={section.group}>
+              {section.options.map(renderOption)}
+            </optgroup>
+          ) : (
+            section.options.map(renderOption)
+          ),
+        )}
       </select>
       <svg
         className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"

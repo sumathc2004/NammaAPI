@@ -36,7 +36,8 @@ const VIEWS = [
   { id: "pending", label: "Pending", match: (e: BulkpeEntry) => !/^(success|failed)$/i.test(e.status) },
   { id: "failed", label: "Failed", match: (e: BulkpeEntry) => /^failed$/i.test(e.status) },
 ] as const;
-type ViewId = (typeof VIEWS)[number]["id"];
+/** Dropdown ids for filtering by BUL account are "bul:" + the account ("bul:BUL 6752"). */
+const BUL_VIEW_PREFIX = "bul:";
 
 const STATUS_STYLES: Record<string, string> = {
   SUCCESS: "bg-status-success-bg text-status-success",
@@ -247,7 +248,7 @@ export function BulkpeStatementView() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderError, setOlderError] = useState<string | null>(null);
-  const [viewId, setViewId] = useState<ViewId>("all");
+  const [viewId, setViewId] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [mobileLimit, setMobileLimit] = useState(MOBILE_PAGE);
@@ -299,7 +300,22 @@ export function BulkpeStatementView() {
     setLoadingOlder(false);
   }
 
-  const view = VIEWS.find((v) => v.id === viewId) ?? VIEWS[0];
+  // The dropdown also lists every BUL account in the loaded entries ("BUL 6752 (12)"), so one account's
+  // movements can be picked straight from it. The chosen account stays listed even if it has no entries now.
+  const bulAccounts = useMemo(() => {
+    const accounts = new Set(entries.map((e) => e.bulAccount).filter(Boolean));
+    if (viewId.startsWith(BUL_VIEW_PREFIX)) accounts.add(viewId.slice(BUL_VIEW_PREFIX.length));
+    return [...accounts].sort();
+  }, [entries, viewId]);
+  const view = useMemo(() => {
+    const fixed = VIEWS.find((v) => v.id === viewId);
+    if (fixed) return fixed;
+    if (viewId.startsWith(BUL_VIEW_PREFIX)) {
+      const account = viewId.slice(BUL_VIEW_PREFIX.length);
+      return { id: viewId, label: account, match: (e: BulkpeEntry) => e.bulAccount === account };
+    }
+    return VIEWS[0];
+  }, [viewId]);
   const visible = useMemo(() => {
     // Case, spaces, underscores, hyphens and commas don't matter: "bul6752", "BUL_6752", "bul 6752" and
     // "6752" (the vendor's token) all find BUL 6752, and "44,095" finds ₹44,095.
@@ -359,17 +375,25 @@ export function BulkpeStatementView() {
             label="Show"
             value={viewId}
             onChange={(id) => {
-              setViewId(id as ViewId);
+              setViewId(id);
               setMobileLimit(MOBILE_PAGE);
             }}
             disabled={!ready}
             className="w-36 shrink-0"
-            options={VIEWS.map((v) => ({
-              id: v.id,
-              label: v.label,
-              count: ready ? entries.filter(v.match).length : null,
-              alert: v.id === "failed",
-            }))}
+            options={[
+              ...VIEWS.map((v) => ({
+                id: v.id,
+                label: v.label,
+                count: ready ? entries.filter(v.match).length : null,
+                alert: v.id === "failed",
+              })),
+              ...bulAccounts.map((account) => ({
+                id: BUL_VIEW_PREFIX + account,
+                label: account,
+                count: ready ? entries.filter((e) => e.bulAccount === account).length : null,
+                group: "BUL account",
+              })),
+            ]}
           />
 
           <div className="relative min-w-0 flex-1 basis-32">
