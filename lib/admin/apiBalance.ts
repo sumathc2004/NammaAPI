@@ -15,8 +15,8 @@ export type ApiLevelBalance = {
 /** The BUL accounts (`bul_0080` …). Super-access accounts see only these. */
 export const isBulAccount = (key: string) => /^bul/i.test(key);
 
-/** The only BUL accounts a super-access login may see: the last four digits of `bul_6633` and `bul_6752`. */
-export const SUPER_ACCESS_BUL_CODES = ["6633", "6752"];
+/** The only BUL accounts a super-access login may see: the last four digits of `bul_0724`, `bul_5512`, `bul_6633` and `bul_6752`. */
+export const SUPER_ACCESS_BUL_CODES = ["0724", "5512", "6633", "6752"];
 
 export const isSuperAccessBul = (key: string) => {
   const code = /^bul\D*(\d+)$/i.exec(key.trim())?.[1];

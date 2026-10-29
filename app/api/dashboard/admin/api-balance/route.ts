@@ -9,7 +9,7 @@ const RATE_LIMIT = { limit: 30, windowMs: 10 * 60 * 1000 };
 
 /**
  * GET /api/dashboard/admin/api-balance → vendor getapiLevelbalance. Checked server-side: admins and
- * accountants get everything; super access gets only BUL 6633 and BUL 6752 (the wallet, the difference and
+ * accountants get everything; super access gets only BUL 0724, 5512, 6633 and 6752 (the wallet, the difference and
  * every other account are stripped here, not just hidden in the UI).
  */
 export async function GET(request: Request) {
