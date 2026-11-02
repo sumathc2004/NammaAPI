@@ -1199,8 +1199,12 @@ export function ReportView({
                     )}
                   >
                     {/* Vendor and shop (e.g. "bulkpe", "Tamilpay") above the time. */}
-                    <RowTime label={details[0]} sub={details[1]} time={listTime(row)} />
+                    <RowTime label={details[0]} time={listTime(row)} />
                     <span className="min-w-0">
+                      {/* The shop name in italics, right above the customer name and cut to the same width. */}
+                      <span className="block h-4 truncate text-[11.5px] font-medium italic leading-4 tracking-wide text-brand-primary" title={details[1]}>
+                        {details[1]}
+                      </span>
                       {listTitle && (
                         <span className="block truncate text-sm font-medium text-text-primary" title={cellValue(listTitle, row)}>
                           {cellValue(listTitle, row) || "—"}
