@@ -134,7 +134,7 @@ function RefreshButton({ busy, onClick, className, iconOnly }: { busy: boolean; 
       disabled={busy}
       title="Check this collection's status again"
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50",
+        "relative inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50",
         className,
       )}
     >
