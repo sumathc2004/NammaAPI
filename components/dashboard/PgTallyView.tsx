@@ -302,7 +302,7 @@ function TallyRow({
   return (
     <li
       className={cn(
-        "grid h-[5.5rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
+        "grid h-[4.5rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
         issue && "bg-status-failed-bg/40",
         className,
       )}
@@ -312,33 +312,29 @@ function TallyRow({
         <span className="block whitespace-nowrap text-sm text-text-secondary">{time}</span>
       </span>
 
-      {/* Four lines, each on its own so nothing is cut off: retailer, mobile · settlement, reference, collection ID. */}
+      {/* Three lines: retailer, reference, collection ID (the mobile number and settlement type are in the tooltip). */}
       <span className="min-w-0 [&>span]:block [&>span]:truncate">
-        <span className="h-5 text-sm font-medium text-text-primary" title={row.vendorName}>
+        <span className="h-5 text-sm font-medium text-text-primary" title={[row.vendorName, meta].filter(Boolean).join(" · ")}>
           {row.vendorName}
         </span>
-        <span className="h-4 text-xs text-text-secondary">{meta}</span>
-        <span className="h-4 font-mono text-[11px] text-text-secondary/80">{row.referenceNumber}</span>
-        <span className="h-4 font-mono text-[11px] text-text-secondary/80">{row.collectionId !== row.referenceNumber ? row.collectionId : ""}</span>
+        <span className="h-4 font-mono text-[11px] text-text-secondary">{row.referenceNumber}</span>
+        <span className="h-4 font-mono text-[11px] text-text-secondary">{row.collectionId !== row.referenceNumber ? row.collectionId : ""}</span>
       </span>
 
-      {/* Four lines: credited amount, the fee, the status, then the wallet credit (or the status check). */}
+      {/* Three lines: credited amount, the fee, then the status with the wallet credit (or the status check) beside it. */}
       <span className="flex flex-col items-end text-right [&>span]:flex [&>span]:items-center [&>span]:justify-end">
         <span className="h-5 whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
         <span className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title={`${inr(row.debitFromCard)} charged to the card − ${inr(row.charges)} fee`}>
           − {inr(row.charges)} fee
         </span>
-        <span className="h-4">
-          <StatusText tone={statusTone(row.status)}>{row.status}</StatusText>
-        </span>
         <span className="h-5 gap-2">
+          <StatusText tone={statusTone(row.status)}>{row.status}</StatusText>
           {wallet && (
             <span
               className={cn("whitespace-nowrap text-[11px] font-medium", check === "ok" ? "text-status-success" : "text-status-failed")}
               title={credited ? `Credited to the wallet ${credited.day}, ${credited.time}` : undefined}
             >
               {check === "ok" ? "✓ Credited" : wallet.text}
-              {credited && <span className="ml-1 font-normal text-text-secondary">{credited.time}</span>}
             </span>
           )}
           {canCheck && <RefreshButton busy={checking} onClick={onCheck} className="px-1.5 py-0 text-[11px]" />}

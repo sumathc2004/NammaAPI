@@ -64,10 +64,16 @@ function entryTitle(entry: BulkpeEntry): string {
   return entry.holderName || entry.beneficiaryName || "Payout";
 }
 
+/** Long codes shortened to their first and last three characters ("HDFC0000128" → "HDF…128"); the full code stays in the tooltip. */
+function short(code: string): string {
+  return code.length > 8 ? `${code.slice(0, 3)}…${code.slice(-3)}` : code;
+}
+
 /** Second line: the account for payouts, the reference (e.g. the PG collection) for money in. */
-function entrySubtitle(entry: BulkpeEntry): string {
+function entrySubtitle(entry: BulkpeEntry, shorten = false): string {
   if (isCredit(entry)) return entry.reference;
-  return [entry.account, entry.ifsc].filter(Boolean).join(" · ") || entry.reference;
+  const ifsc = shorten ? short(entry.ifsc) : entry.ifsc;
+  return [entry.account, ifsc].filter(Boolean).join(" · ") || entry.reference;
 }
 
 function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
@@ -132,11 +138,15 @@ function EntryRow({
         onClick={onToggle}
         aria-expanded={open}
         // Narrow panels and phones (below @xl): no direction icon column, so the name gets the room.
-        className="grid h-[5.5rem] w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
+        className="grid h-[4.5rem] w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
       >
+        {/* The BUL account this entry went through, above the time (and the date, when it isn't today). */}
         <span className="tabular-nums">
-          {!isToday && <span className="block text-[11px] text-text-secondary">{day}</span>}
+          <span className="block h-4 truncate text-[11px] font-semibold text-brand-navy/80" title="BUL account this entry went through">
+            {entry.bulAccount}
+          </span>
           <span className="block whitespace-nowrap text-sm text-text-secondary">{time}</span>
+          {!isToday && <span className="block text-[11px] text-text-secondary">{day}</span>}
         </span>
 
         {/* Direction: money in (green, arrow down) or a payout (arrow up); red when it failed. */}
@@ -153,24 +163,23 @@ function EntryRow({
           </svg>
         </span>
 
-        {/* Four lines: who, the BUL account, the account · IFSC (or the reference for money in), then the UTR (or the bank's failure message). */}
+        {/* Three lines: who, the account · IFSC (the reference for money in), then the UTR (or the bank's failure message). Codes are shortened: first and last three characters. */}
         <span className="min-w-0 [&>span]:block [&>span]:truncate">
           <span className="h-5 text-sm font-medium text-text-primary" title={entryTitle(entry)}>
             {entryTitle(entry)}
           </span>
-          <span className="h-4 text-xs font-semibold text-brand-navy/80">{entry.bulAccount}</span>
           <span className="h-4 font-mono text-[11px] text-text-secondary" title={entrySubtitle(entry)}>
-            {entrySubtitle(entry)}
+            {entrySubtitle(entry, true)}
           </span>
           <span
-            className={cn("h-4 font-mono text-[11px]", failed ? "font-sans text-status-failed" : "text-text-secondary/80")}
+            className={cn("h-4 font-mono text-[11px]", failed ? "font-sans text-status-failed" : "text-text-secondary")}
             title={note}
           >
-            {failed ? note : entry.utr ? `UTR ${entry.utr}` : ""}
+            {failed ? note : entry.utr ? `UTR ${short(entry.utr)}` : ""}
           </span>
         </span>
 
-        {/* Four lines: amount, the balance after it, the payout's charge with its GST (money in has none), then the status. */}
+        {/* Three lines: amount, the balance after it, then the payout's charge and GST as one fee beside the status. */}
         <span className="flex flex-col items-end text-right [&>span]:flex [&>span]:items-center [&>span]:justify-end">
           <span
             className={cn(
@@ -184,13 +193,15 @@ function EntryRow({
           <span className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Balance after this entry">
             {entry.closingBalance !== null && `Bal ${inr(entry.closingBalance)}`}
           </span>
-          <span
-            className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
-            title={entry.charge > 0 ? `Charges ${inr(entry.charge)} + GST ${inr(entry.gst)}` : undefined}
-          >
-            {entry.charge > 0 && `${inr(entry.charge)}${entry.gst > 0 ? ` + ${inr(entry.gst)} GST` : ""}`}
-          </span>
-          <span className="h-4">
+          <span className="h-5 gap-2">
+            {entry.charge > 0 && (
+              <span
+                className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
+                title={`Charges ${inr(entry.charge)} + GST ${inr(entry.gst)}`}
+              >
+                {inr(Math.round((entry.charge + entry.gst) * 100) / 100)} fee
+              </span>
+            )}
             <StatusText>{entry.status}</StatusText>
           </span>
         </span>
