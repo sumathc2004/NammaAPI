@@ -1177,7 +1177,7 @@ export function ReportView({
                 return (
                   <li
                     key={currentPage * PAGE_SIZE + i}
-                    className="grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2 transition-colors hover:bg-brand-light/40"
+                    className="grid min-h-[4.25rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-1.5 transition-colors hover:bg-brand-light/40"
                   >
                     <span className="whitespace-nowrap text-sm tabular-nums text-text-primary">{listTime(row)}</span>
                     <span className="min-w-0">
@@ -1200,15 +1200,18 @@ export function ReportView({
                         ) : null;
                       })}
                     </span>
-                    <span className="flex flex-col items-end gap-1">
+                    <span className="flex flex-col items-end gap-0.5">
                       {amount && <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{formatAmount(amount)}</span>}
                       {listCharge && Number(cellValue(listCharge, row)) > 0 && (
                         <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Transfer charges">
                           Charges {formatAmount(cellValue(listCharge, row))}
                         </span>
                       )}
-                      {listStatus && <Cell column={listStatus} row={row} variant="table" />}
-                      {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} />}
+                      {/* Last line: the status with the Dequeue / Enqueue + Refund buttons beside it. */}
+                      <span className="flex flex-wrap items-center justify-end gap-1">
+                        {listStatus && <Cell column={listStatus} row={row} variant="table" />}
+                        {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} />}
+                      </span>
                     </span>
                   </li>
                 );

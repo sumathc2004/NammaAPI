@@ -88,11 +88,18 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={cn(badge, STATUS_STYLES[status.toUpperCase()] ?? "bg-brand-light text-text-secondary")}>{status}</span>;
 }
 
-/** Wallet badge, with the credit date and time underneath once credited. */
-function WalletBadge({ row, className }: { row: PgTallyRow; className?: string }) {
+/** Wallet badge, with the credit date and time underneath once credited (`inline`: only in the tooltip). */
+function WalletBadge({ row, className, inline }: { row: PgTallyRow; className?: string; inline?: boolean }) {
   const wallet = WALLET[tallyCheck(row)];
   if (!wallet) return <span className="text-text-secondary">—</span>;
   const credited = row.walletCreditCount > 0 && row.walletCreditTime ? dateParts(row.walletCreditTime) : null;
+  if (inline) {
+    return (
+      <span className={cn(badge, wallet.className)} title={credited ? `Credited to the wallet ${credited.day}, ${credited.time}` : undefined}>
+        {wallet.text}
+      </span>
+    );
+  }
   return (
     <span className={cn("inline-flex flex-col items-start gap-0.5", className)}>
       <span className={cn(badge, wallet.className)}>{wallet.text}</span>
@@ -116,14 +123,17 @@ function dateParts(iso: string): { date: string; day: string; time: string } {
   };
 }
 
-function RefreshButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+function RefreshButton({ busy, onClick, className }: { busy: boolean; onClick: () => void; className?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={busy}
       title="Check this collection's status again"
-      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50"
+      className={cn(
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50",
+        className,
+      )}
     >
       <svg
         width="12"
@@ -288,7 +298,7 @@ function TallyRow({
   return (
     <li
       className={cn(
-        "grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2",
+        "grid min-h-[4.25rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-1.5",
         issue && "bg-status-failed-bg/40",
         className,
       )}
@@ -313,15 +323,17 @@ function TallyRow({
         <span className="block font-mono text-[11px] text-text-secondary wrap-anywhere">{refs.join(" · ")}</span>
       </span>
 
-      {/* Money and state, stacked to stay narrow: credited amount, the fee, status, then the wallet badge or the status check. */}
-      <span className="flex flex-col items-end gap-1 text-right">
+      {/* Money and state in three lines: credited amount, the fee, then status with the wallet badge (or the status check) beside it. */}
+      <span className="flex flex-col items-end gap-0.5 text-right">
         <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
         <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title={`${inr(row.debitFromCard)} charged to the card − ${inr(row.charges)} fee`}>
           − {inr(row.charges)} fee
         </span>
-        <StatusBadge status={row.status} />
-        {showWallet && WALLET[tallyCheck(row)] && <WalletBadge row={row} className="items-end text-right" />}
-        {canCheck && <RefreshButton busy={checking} onClick={onCheck} />}
+        <span className="flex items-center justify-end gap-1">
+          <StatusBadge status={row.status} />
+          {showWallet && WALLET[tallyCheck(row)] && <WalletBadge row={row} inline />}
+          {canCheck && <RefreshButton busy={checking} onClick={onCheck} className="py-0.5" />}
+        </span>
       </span>
     </li>
   );

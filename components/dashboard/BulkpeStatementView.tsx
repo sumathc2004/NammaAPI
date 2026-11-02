@@ -149,8 +149,8 @@ function EntryRow({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        // Phones (panel narrower than @md): no direction icon column, so the name gets the room.
-        className="grid w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-2.5 text-left transition-colors hover:bg-brand-light/50 @md:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
+        // Narrow panels and phones (below @xl): no direction icon column, so the name gets the room.
+        className="grid min-h-[4.25rem] w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-1.5 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
       >
         <span className="tabular-nums">
           {!isToday && <span className="block text-[11px] text-text-secondary">{day}</span>}
@@ -160,7 +160,7 @@ function EntryRow({
         {/* Direction: money in (green, arrow down) or a payout (arrow up); red when it failed. */}
         <span
           className={cn(
-            "mt-0.5 hidden size-7 items-center justify-center rounded-full @md:flex",
+            "mt-0.5 hidden size-7 items-center justify-center rounded-full @xl:flex",
             failed ? "bg-status-failed-bg text-status-failed" : credit ? "bg-status-success-bg text-status-success" : "bg-brand-light text-brand-navy",
           )}
           title={failed ? "Failed: no money moved" : credit ? "Money in" : "Payout"}
@@ -172,11 +172,11 @@ function EntryRow({
         </span>
 
         <span className="min-w-0">
-          {/* The BUL chip wraps under the name when there's no room beside it. */}
-          <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-            <span className="max-w-full truncate text-sm font-medium text-text-primary" title={entryTitle(entry)}>
-              {entryTitle(entry)}
-            </span>
+          <span className="block truncate text-sm font-medium text-text-primary" title={entryTitle(entry)}>
+            {entryTitle(entry)}
+          </span>
+          {/* The BUL chip sits before the account line, so every row keeps the same three lines. */}
+          <span className="flex min-w-0 items-center gap-1.5">
             {entry.bulAccount && (
               <span
                 className="shrink-0 rounded-md bg-brand-light px-1.5 py-px font-mono text-[10px] font-semibold text-text-secondary"
@@ -185,8 +185,10 @@ function EntryRow({
                 {entry.bulAccount}
               </span>
             )}
+            <span className="min-w-0 truncate font-mono text-[11px] text-text-secondary" title={entrySubtitle(entry)}>
+              {entrySubtitle(entry)}
+            </span>
           </span>
-          <span className="block truncate font-mono text-[11px] text-text-secondary">{entrySubtitle(entry)}</span>
           {note && (
             <span
               className={cn("block truncate text-[11px]", failed ? "text-status-failed" : "font-mono text-text-secondary")}
@@ -197,7 +199,7 @@ function EntryRow({
           )}
         </span>
 
-        <span className="flex flex-col items-end gap-1 text-right">
+        <span className="flex flex-col items-end gap-0.5 text-right">
           <span
             className={cn(
               "whitespace-nowrap text-sm font-semibold tabular-nums",
@@ -212,17 +214,29 @@ function EntryRow({
               Bal {inr(entry.closingBalance)}
             </span>
           )}
-          {/* The payout's charge with the GST on it, "₹18.00 + ₹3.24 GST" (money in has none). */}
+          {/* The payout's charge with the GST on it, "₹18.00 + ₹3.24 GST" (money in has none): beside the status
+              when the panel is wide enough (@sm), on a line of its own when it is narrow. */}
           {entry.charge > 0 && (
             <span
-              className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
+              className="@sm:hidden whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
               title={`Charges ${inr(entry.charge)} + GST ${inr(entry.gst)}`}
             >
               {inr(entry.charge)}
               {entry.gst > 0 && ` + ${inr(entry.gst)} GST`}
             </span>
           )}
-          <StatusBadge status={entry.status} />
+          <span className="flex items-center justify-end gap-1.5">
+            {entry.charge > 0 && (
+              <span
+                className="hidden @sm:inline whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
+                title={`Charges ${inr(entry.charge)} + GST ${inr(entry.gst)}`}
+              >
+                {inr(entry.charge)}
+                {entry.gst > 0 && ` + ${inr(entry.gst)} GST`}
+              </span>
+            )}
+            <StatusBadge status={entry.status} />
+          </span>
         </span>
       </button>
       {open && <EntryDetails entry={entry} />}
