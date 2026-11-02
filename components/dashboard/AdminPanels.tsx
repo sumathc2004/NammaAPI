@@ -17,8 +17,8 @@ type PanelId = (typeof PANELS)[number]["id"];
  * Admin page panels, laid out by the width of the content area (`AdminOverview` is the
  * `@container`), so a collapsed sidebar gives the same result as a wider screen:
  * - ≥ @5xl (64rem of content, e.g. a 1366px laptop with the sidebar open, or 1280px with it
- *   collapsed): three columns — PG Tally | Bulkpe Statement | Transfer Reports — filling the rest
- *   of the screen (each panel scrolls inside), never shorter than 16rem — the page scrolls only when the window is too short for that.
+ *   collapsed): three columns — PG Tally | Bulkpe Statement | Transfer Reports — each as tall as the
+ *   screen (each panel scrolls inside with its own slim scrollbar; the page scrolls past the balance cards).
  * - ≥ @3xl (48rem): PG Tally and Transfer Reports side by side, the Bulkpe statement full width
  *   below; fixed heights, the page scrolls.
  * - Below that: a switch shows one at a time, so phones get one list that scrolls with the page
@@ -29,7 +29,7 @@ export function AdminPanels() {
   const [active, setActive] = useState<PanelId>("pg");
 
   return (
-    <div className="flex flex-1 flex-col gap-3 @5xl:min-h-0">
+    <div className="flex flex-1 flex-col gap-3">
       <div
         role="tablist"
         aria-label="Admin reports"
@@ -52,11 +52,11 @@ export function AdminPanels() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 @3xl:grid-cols-2 @5xl:min-h-64 @5xl:flex-1 @5xl:grid-cols-3 @5xl:grid-rows-[minmax(0,1fr)] @5xl:items-stretch">
+      <div className="grid grid-cols-1 items-start gap-4 @3xl:grid-cols-2 @5xl:grid-cols-3">
         {/* Two columns: both down to the bottom of the screen. Three: the row's full height. */}
         <div
           className={cn(
-            "min-w-0 @3xl:h-[max(26rem,calc(100dvh-23rem))] @5xl:h-auto @5xl:min-h-0",
+            "min-w-0 @3xl:h-[max(26rem,calc(100dvh-23rem))] @5xl:h-[max(24rem,calc(100dvh-7.5rem))]",
             active !== "pg" && "hidden @3xl:block",
           )}
         >
@@ -65,7 +65,7 @@ export function AdminPanels() {
         {/* Middle column with three; with two it moves below the other two, full width. Rows scroll inside from tablet up. */}
         <div
           className={cn(
-            "min-w-0 md:h-160 @3xl:order-last @3xl:col-span-2 @3xl:h-144 @5xl:order-0 @5xl:col-span-1 @5xl:h-auto @5xl:min-h-0",
+            "min-w-0 md:h-160 @3xl:order-last @3xl:col-span-2 @3xl:h-144 @5xl:order-0 @5xl:col-span-1 @5xl:h-[max(24rem,calc(100dvh-7.5rem))]",
             active !== "bulkpe" && "hidden @3xl:block",
           )}
         >
@@ -73,7 +73,7 @@ export function AdminPanels() {
         </div>
         <div
           className={cn(
-            "min-w-0 md:h-160 @3xl:h-[max(26rem,calc(100dvh-23rem))] @5xl:h-auto @5xl:min-h-0",
+            "min-w-0 md:h-160 @3xl:h-[max(26rem,calc(100dvh-23rem))] @5xl:h-[max(24rem,calc(100dvh-7.5rem))]",
             active !== "transfer" && "hidden @3xl:block",
           )}
         >
