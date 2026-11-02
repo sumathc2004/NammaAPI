@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { CopyButton } from "@/components/dashboard/CopyButton";
 import { RowTime } from "@/components/dashboard/RowTime";
-import { StatusText } from "@/components/dashboard/StatusText";
+import { StatusText, rowTint } from "@/components/dashboard/StatusText";
 import { shortCode as short } from "@/lib/reports/shortCode";
 import { isCredit, mergeEntries, statementTotals, type BulkpeEntry } from "@/lib/admin/bulkpeStatement";
 import { cn } from "@/lib/cn";
@@ -130,7 +130,7 @@ function EntryRow({
   const note = failed ? entry.statusDescription.trim() : entry.utr ? `UTR ${entry.utr}` : "";
 
   return (
-    <li className={cn(failed && "bg-status-failed-bg/40", className)}>
+    <li className={cn(rowTint(entry.status), className)}>
       {/* A div, not a button, so the copy buttons inside are not buttons within a button: a click anywhere on the row
           opens it, and the name is the real button (Tab to it, Enter / Space) for keyboard users. */}
       <div

@@ -12,7 +12,7 @@ import {
 } from "@/lib/admin/pgTally";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { RowTime } from "@/components/dashboard/RowTime";
-import { StatusText, statusTone } from "@/components/dashboard/StatusText";
+import { StatusText, rowTint, statusTone } from "@/components/dashboard/StatusText";
 import { toIsoDate } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
 
@@ -304,7 +304,7 @@ function TallyRow({
     <li
       className={cn(
         "grid h-[4.5rem] grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
-        issue && "bg-status-failed-bg/40",
+        rowTint(row.status, issue),
         className,
       )}
     >

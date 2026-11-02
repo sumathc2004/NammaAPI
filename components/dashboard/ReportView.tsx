@@ -9,7 +9,7 @@ import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { RowTime } from "@/components/dashboard/RowTime";
-import { StatusText } from "@/components/dashboard/StatusText";
+import { StatusText, rowTint } from "@/components/dashboard/StatusText";
 import { CopyButton } from "@/components/dashboard/CopyButton";
 import { shortCode } from "@/lib/reports/shortCode";
 import {
@@ -1192,7 +1192,11 @@ export function ReportView({
                 return (
                   <li
                     key={currentPage * PAGE_SIZE + i}
-                    className="grid h-[4.5rem] grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 transition-colors hover:bg-brand-light/40"
+                    className={cn(
+                      "grid h-[4.5rem] grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 transition-colors",
+                      listStatus ? rowTint(cellValue(listStatus, row)) : "",
+                      !(listStatus && rowTint(cellValue(listStatus, row))) && "hover:bg-brand-light/40",
+                    )}
                   >
                     {/* Vendor and shop (e.g. "bulkpe", "Tamilpay") above the time. */}
                     <RowTime label={details[0]} sub={details[1]} time={listTime(row)} />
