@@ -67,13 +67,6 @@ function entryTitle(entry: BulkpeEntry): string {
   return entry.holderName || entry.beneficiaryName || "Payout";
 }
 
-/** Second line: the account for payouts, the reference (e.g. the PG collection) for money in. */
-function entrySubtitle(entry: BulkpeEntry, shorten = false): string {
-  if (isCredit(entry)) return entry.reference;
-  const ifsc = shorten ? short(entry.ifsc) : entry.ifsc;
-  return [entry.account, ifsc].filter(Boolean).join(" · ") || entry.reference;
-}
-
 function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   if (!value) return null;
   return (
@@ -136,7 +129,7 @@ function EntryRow({
       <div
         onClick={onToggle}
         // Narrow panels and phones (below @xl): no direction icon column, so the name gets the room.
-        className="grid h-[4.5rem] w-full cursor-pointer grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[4.5rem_1.75rem_minmax(0,1fr)_auto]"
+        className="grid h-14 w-full cursor-pointer grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[4.5rem_1.75rem_minmax(0,1fr)_auto]"
       >
         {/* The BUL account this entry went through, above the time (and the date, when it isn't today). */}
         <RowTime label={entry.bulAccount} time={time} day={isToday ? undefined : day} />
@@ -155,8 +148,9 @@ function EntryRow({
           </svg>
         </span>
 
-        {/* Three lines: who, the account · IFSC (the reference for money in), then the UTR (or the bank's failure message). Codes are shortened: first and last three characters. */}
-        <span className="min-w-0">
+        {/* Two lines: who, then the IFSC and UTR (shortened to first and last three characters, each with a copy icon),
+            or the reference for money in, or the bank's failure message. */}
+        <span className="min-w-0 overflow-hidden">
           <button
             type="button"
             aria-expanded={open}
@@ -165,55 +159,64 @@ function EntryRow({
               onToggle();
             }}
             className="block h-5 w-full truncate text-left text-sm font-medium text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
-            title={entryTitle(entry)}
+            title={[entryTitle(entry), entry.account].filter(Boolean).join(" · ")}
           >
             {entryTitle(entry)}
           </button>
-          {/* Account · IFSC, the IFSC shortened with a copy button for the full code. */}
-          <span className="flex h-4 items-center gap-1 font-mono text-[11px] text-text-secondary" title={entrySubtitle(entry)}>
-            <span className="truncate">{entrySubtitle(entry, true)}</span>
-            {!credit && <CopyButton value={entry.ifsc} label="IFSC" className="size-4" />}
-          </span>
-          {/* UTR shortened with a copy button for the full number (or the bank's failure message). */}
-          <span
-            className={cn("flex h-4 items-center gap-1 font-mono text-[11px]", failed ? "font-sans text-status-failed" : "text-text-secondary")}
-            title={note}
-          >
+          <span className="flex h-4 min-w-0 items-center gap-1 font-mono text-[10px] text-text-secondary">
             {failed ? (
-              <span className="truncate">{note}</span>
-            ) : entry.utr ? (
+              <span className="truncate font-sans text-[11px] text-status-failed" title={note}>
+                {note}
+              </span>
+            ) : credit ? (
+              <span className="inline-flex min-w-0 items-center">
+                <span className="truncate">{entry.reference}</span>
+                <CopyButton value={entry.reference} label="reference" className="size-3.5" />
+              </span>
+            ) : (
               <>
-                <span className="truncate">UTR {short(entry.utr)}</span>
-                <CopyButton value={entry.utr} label="UTR" className="size-4" />
+                {entry.ifsc && (
+                  <span className="inline-flex min-w-0 items-center" title={`IFSC ${entry.ifsc}`}>
+                    <span className="mr-1 font-sans text-[9px] uppercase tracking-wide">IFSC</span>
+                    <span className="truncate">{short(entry.ifsc)}</span>
+                    <CopyButton value={entry.ifsc} label="IFSC" className="size-3.5" />
+                  </span>
+                )}
+                {entry.utr && (
+                  <span className="inline-flex min-w-0 items-center" title={`UTR ${entry.utr}`}>
+                    <span className="mr-1 font-sans text-[9px] uppercase tracking-wide">UTR</span>
+                    <span className="truncate">{short(entry.utr)}</span>
+                    <CopyButton value={entry.utr} label="UTR" className="size-3.5" />
+                  </span>
+                )}
               </>
-            ) : null}
+            )}
           </span>
         </span>
 
-        {/* Three lines: amount, the balance after it, then the payout's charge and GST as one fee beside the status. */}
+        {/* Two lines: the amount (the balance after it is in the tooltip), then the payout's charge and GST as one fee beside the status. */}
         <span className="flex flex-col items-end text-right [&>span]:flex [&>span]:items-center [&>span]:justify-end">
           <span
             className={cn(
               "h-5 whitespace-nowrap text-sm font-semibold tabular-nums",
               failed ? "text-text-secondary line-through" : credit ? "text-status-success" : "text-text-primary",
             )}
+            title={entry.closingBalance !== null ? `Balance after this entry: ${inr(entry.closingBalance)}` : undefined}
           >
             {credit ? "+" : "−"}
             {inr(entry.amount)}
           </span>
-          <span className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Balance after this entry">
-            {entry.closingBalance !== null && `Bal ${inr(entry.closingBalance)}`}
-          </span>
-          <span className="h-5 gap-2">
+          <span className="h-5 gap-1.5">
             {entry.charge > 0 && (
               <span
                 className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
                 title={`Charges ${inr(entry.charge)} + GST ${inr(entry.gst)}`}
               >
-                {inr(Math.round((entry.charge + entry.gst) * 100) / 100)} fee
+                {inr(Math.round((entry.charge + entry.gst) * 100) / 100)}
+                <span className="hidden @lg:inline"> fee</span>
               </span>
             )}
-            <StatusText>{entry.status}</StatusText>
+            <StatusText className="px-1.5 @md:px-2 [&>span:first-child]:hidden @md:[&>span:first-child]:block">{entry.status}</StatusText>
           </span>
         </span>
       </div>

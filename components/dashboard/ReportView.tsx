@@ -1193,43 +1193,49 @@ export function ReportView({
                   <li
                     key={currentPage * PAGE_SIZE + i}
                     className={cn(
-                      "grid h-[4.5rem] grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 transition-colors",
+                      "grid h-14 grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 transition-colors @md:grid-cols-[5.25rem_minmax(0,1fr)_auto]",
                       listStatus ? rowTint(cellValue(listStatus, row)) : "",
                       !(listStatus && rowTint(cellValue(listStatus, row))) && "hover:bg-brand-light/40",
                     )}
                   >
-                    {/* Vendor and shop (e.g. "bulkpe", "Tamilpay") above the time. */}
+                    {/* The vendor (e.g. "bulkpe") as a tag above the time. */}
                     <RowTime label={details[0]} time={listTime(row)} />
-                    <span className="min-w-0">
-                      {/* The shop name in italics, right above the customer name and cut to the same width. */}
-                      <span className="block h-4 truncate text-[11.5px] font-medium italic leading-4 tracking-wide text-brand-primary" title={details[1]}>
-                        {details[1]}
-                      </span>
+                    {/* Two lines: the customer, then the shop in italics with the UTR (shortened, with a copy icon). */}
+                    <span className="min-w-0 overflow-hidden">
                       {listTitle && (
-                        <span className="block truncate text-sm font-medium text-text-primary" title={cellValue(listTitle, row)}>
+                        <span className="block h-5 truncate text-sm font-medium text-text-primary" title={cellValue(listTitle, row)}>
                           {cellValue(listTitle, row) || "—"}
                         </span>
                       )}
-                      {listCodes.map((c) => {
-                        const code = cellValue(c, row);
-                        return code ? (
-                          <span key={c.key} className="flex h-4 items-center gap-1 font-mono text-[11px] text-text-secondary" title={`${c.label} ${code}`}>
-                            <span className="truncate">
-                              <span className="font-sans uppercase tracking-wide">{c.label}</span> {shortCode(code)}
-                            </span>
-                            <CopyButton value={code} label={c.label} className="size-4" />
+                      <span className="flex h-4 min-w-0 items-center gap-2 text-[10px] text-text-secondary">
+                        {details[1] && (
+                          <span className="min-w-0 truncate text-[11.5px] font-medium italic tracking-wide text-brand-primary" title={details[1]}>
+                            {details[1]}
                           </span>
-                        ) : null;
-                      })}
+                        )}
+                        {listCodes.map((c) => {
+                          const code = cellValue(c, row);
+                          return code ? (
+                            <span key={c.key} className="inline-flex shrink-0 items-center font-mono" title={`${c.label} ${code}`}>
+                              <span className="mr-1 font-sans text-[9px] uppercase tracking-wide">{c.label}</span>
+                              {shortCode(code)}
+                              <CopyButton value={code} label={c.label} className="size-3.5" />
+                            </span>
+                          ) : null;
+                        })}
+                      </span>
                     </span>
-                    {/* Three lines: amount, the charges, then the status with the Dequeue / Enqueue + Refund buttons beside it. */}
+                    {/* Two lines: the amount, then the charges beside the status and the Dequeue / Enqueue + Refund buttons. */}
                     <span className="flex flex-col items-end text-right [&>span]:flex [&>span]:items-center [&>span]:justify-end">
                       <span className="h-5 whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{amount ? formatAmount(amount) : "—"}</span>
-                      <span className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Transfer charges">
-                        {listCharge && Number(cellValue(listCharge, row)) > 0 && `Charges ${formatAmount(cellValue(listCharge, row))}`}
-                      </span>
-                      <span className="h-5 gap-2">
-                        {listStatus && <StatusText>{cellValue(listStatus, row)}</StatusText>}
+                      <span className="h-5 gap-1.5">
+                        {listCharge && Number(cellValue(listCharge, row)) > 0 && (
+                          <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Transfer charges">
+                            {formatAmount(cellValue(listCharge, row))}
+                            <span className="hidden @lg:inline"> fee</span>
+                          </span>
+                        )}
+                        {listStatus && <StatusText className="px-1.5 @md:px-2 [&>span:first-child]:hidden @md:[&>span:first-child]:block">{cellValue(listStatus, row)}</StatusText>}
                         {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} compact />}
                       </span>
                     </span>

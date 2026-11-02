@@ -446,7 +446,7 @@ export function PgTallyView() {
   const timeOnly = range.from === range.to;
 
   return (
-    <section aria-labelledby="pg-tally-title" className="@container flex min-w-0 flex-col gap-2 xl:h-full">
+    <section aria-labelledby="pg-tally-title" className="@container flex min-w-0 flex-col gap-2 md:h-full">
       {/* Title and totals (no dates: the tally always shows today). */}
       {/* Phones: the totals drop to their own line under the title instead of squeezing it. */}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
