@@ -2,7 +2,7 @@ import { cn } from "@/lib/cn";
 
 /**
  * The first column of the admin panels' rows: an optional tag above the time (the BUL account, the settlement
- * type, the vendor), an optional muted line (the shop), the time, and the date when it isn't today.
+ * type, the vendor), an optional muted line (the shop, in blue italics), the time, and the date when it isn't today.
  */
 export function RowTime({
   time,
@@ -28,7 +28,7 @@ export function RowTime({
         </span>
       )}
       {sub && (
-        <span className="block truncate text-[11px] leading-4 text-text-secondary" title={sub}>
+        <span className="block truncate text-[11.5px] font-medium italic leading-4 tracking-wide text-brand-primary" title={sub}>
           {sub}
         </span>
       )}
