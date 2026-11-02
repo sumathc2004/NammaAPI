@@ -11,6 +11,7 @@ import {
   type TallyCheck,
 } from "@/lib/admin/pgTally";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
+import { CopyButton } from "@/components/dashboard/CopyButton";
 import { RowTime } from "@/components/dashboard/RowTime";
 import { StatusText, rowTint, statusTone } from "@/components/dashboard/StatusText";
 import { toIsoDate } from "@/lib/reports/dates";
@@ -125,7 +126,7 @@ function dateParts(iso: string): { date: string; day: string; time: string } {
   };
 }
 
-function RefreshButton({ busy, onClick, className }: { busy: boolean; onClick: () => void; className?: string }) {
+function RefreshButton({ busy, onClick, className, iconOnly }: { busy: boolean; onClick: () => void; className?: string; iconOnly?: boolean }) {
   return (
     <button
       type="button"
@@ -152,7 +153,7 @@ function RefreshButton({ busy, onClick, className }: { busy: boolean; onClick: (
         <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
         <path d="M18 3v5h-5M6 21v-5h5" />
       </svg>
-      Refresh
+      <span className={iconOnly ? "sr-only" : undefined}>Refresh</span>
     </button>
   );
 }
@@ -303,7 +304,7 @@ function TallyRow({
   return (
     <li
       className={cn(
-        "grid h-[4.5rem] grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
+        "grid h-14 grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 @md:grid-cols-[5.25rem_minmax(0,1fr)_auto]",
         rowTint(row.status, issue),
         className,
       )}
@@ -311,32 +312,44 @@ function TallyRow({
       {/* The settlement type ("Wallet Instant") above the time (and the date, when it isn't today). */}
       <RowTime label={row.settlementType} time={time} day={timeOnly ? undefined : day} />
 
-      {/* Three lines: retailer, reference, collection ID (the mobile number and settlement type are in the tooltip). */}
-      <span className="min-w-0 [&>span]:block [&>span]:truncate">
-        <span className="h-5 text-sm font-medium text-text-primary" title={[row.vendorName, meta].filter(Boolean).join(" · ")}>
+      {/* Two lines: the retailer, then the reference and collection ID, small, on one line with a copy icon each. */}
+      <span className="min-w-0 overflow-hidden">
+        <span className="block h-5 truncate text-sm font-medium text-text-primary" title={[row.vendorName, meta].filter(Boolean).join(" · ")}>
           {row.vendorName}
         </span>
-        <span className="h-4 font-mono text-[11px] text-text-secondary">{row.referenceNumber}</span>
-        <span className="h-4 font-mono text-[11px] text-text-secondary">{row.collectionId !== row.referenceNumber ? row.collectionId : ""}</span>
+        <span className="flex h-4 min-w-0 items-center gap-1 font-mono text-[10px] text-text-secondary">
+          {[row.referenceNumber, row.collectionId !== row.referenceNumber ? row.collectionId : ""].map(
+            (code, n) =>
+              code && (
+                <span key={n} className="inline-flex min-w-0 items-center">
+                  <span className="truncate">{code}</span>
+                  <CopyButton value={code} label={n === 0 ? "reference" : "collection ID"} className="size-3.5" />
+                </span>
+              ),
+          )}
+        </span>
       </span>
 
-      {/* Three lines: credited amount, the fee, then the status with the wallet credit (or the status check) beside it. */}
+      {/* Two lines: the credited amount, then the fee beside the status (✓ = credited to the wallet, or the status check). */}
       <span className="flex flex-col items-end text-right [&>span]:flex [&>span]:items-center [&>span]:justify-end">
         <span className="h-5 whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
-        <span className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title={`${inr(row.debitFromCard)} charged to the card − ${inr(row.charges)} fee`}>
-          − {inr(row.charges)} fee
-        </span>
-        <span className="h-5 gap-2">
-          <StatusText tone={statusTone(row.status)}>{row.status}</StatusText>
+        <span className="h-5 gap-1.5">
+          <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title={`${inr(row.debitFromCard)} charged to the card − ${inr(row.charges)} fee`}>
+            {inr(row.charges)}
+            <span className="hidden @lg:inline"> fee</span>
+          </span>
+          <StatusText tone={statusTone(row.status)} className="px-1.5 @md:px-2 [&>span:first-child]:hidden @md:[&>span:first-child]:block">
+            {row.status}
+          </StatusText>
           {wallet && (
             <span
-              className={cn("whitespace-nowrap text-[11px] font-medium", check === "ok" ? "text-status-success" : "text-status-failed")}
-              title={credited ? `Credited to the wallet ${credited.day}, ${credited.time}` : undefined}
+              className={cn("whitespace-nowrap text-[11px] font-semibold", check === "ok" ? "text-status-success" : "text-status-failed")}
+              title={check === "ok" ? (credited ? `Credited to the wallet ${credited.day}, ${credited.time}` : "Credited to the wallet") : wallet.text}
             >
-              {check === "ok" ? "✓ Credited" : wallet.text}
+              {check === "ok" ? "✓" : wallet.text}
             </span>
           )}
-          {canCheck && <RefreshButton busy={checking} onClick={onCheck} className="px-1.5 py-0 text-[11px]" />}
+          {canCheck && <RefreshButton busy={checking} onClick={onCheck} iconOnly className="px-1.5 py-0.5" />}
         </span>
       </span>
     </li>

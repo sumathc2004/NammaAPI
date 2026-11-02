@@ -21,7 +21,7 @@ export function RowTime({
     <span className={cn("min-w-0 tabular-nums", className)}>
       {label && (
         <span
-          className="mb-0.5 block w-fit max-w-full truncate rounded-md bg-brand-light px-1.5 text-[10px] font-semibold leading-4 text-brand-navy"
+          className="mb-0.5 block w-fit max-w-full truncate rounded-md bg-brand-light px-1 text-[9px] font-semibold leading-4 text-brand-navy @md:px-1.5 @md:text-[10px]"
           title={label}
         >
           {label}
