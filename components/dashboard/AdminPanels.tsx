@@ -18,7 +18,7 @@ type PanelId = (typeof PANELS)[number]["id"];
  * `@container`), so a collapsed sidebar gives the same result as a wider screen:
  * - ≥ @5xl (64rem of content, e.g. a 1366px laptop with the sidebar open, or 1280px with it
  *   collapsed): three columns — PG Tally | Bulkpe Statement | Transfer Reports — filling the rest
- *   of the screen (each panel scrolls inside), never shorter than 22rem — the page scrolls only when the window is too short for that.
+ *   of the screen (each panel scrolls inside), never shorter than 16rem — the page scrolls only when the window is too short for that.
  * - ≥ @3xl (48rem): PG Tally and Transfer Reports side by side, the Bulkpe statement full width
  *   below; fixed heights, the page scrolls.
  * - Below that: a switch shows one at a time, so phones get one list that scrolls with the page
@@ -52,7 +52,7 @@ export function AdminPanels() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 @3xl:grid-cols-2 @5xl:min-h-88 @5xl:flex-1 @5xl:grid-cols-3 @5xl:grid-rows-[minmax(0,1fr)] @5xl:items-stretch">
+      <div className="grid grid-cols-1 items-start gap-4 @3xl:grid-cols-2 @5xl:min-h-64 @5xl:flex-1 @5xl:grid-cols-3 @5xl:grid-rows-[minmax(0,1fr)] @5xl:items-stretch">
         {/* Two columns: both down to the bottom of the screen. Three: the row's full height. */}
         <div
           className={cn(
