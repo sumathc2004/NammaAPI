@@ -302,14 +302,18 @@ function TallyRow({
   return (
     <li
       className={cn(
-        "grid h-[4.5rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
+        "grid h-[4.5rem] grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
         issue && "bg-status-failed-bg/40",
         className,
       )}
     >
-      <span className="tabular-nums">
-        {!timeOnly && <span className="block text-[11px] text-text-secondary">{day}</span>}
+      {/* The settlement type ("Wallet Instant") above the time (and the date, when it isn't today). */}
+      <span className="min-w-0 tabular-nums">
+        <span className="block h-4 truncate text-[11px] font-semibold text-brand-navy/80" title="Settlement type">
+          {row.settlementType}
+        </span>
         <span className="block whitespace-nowrap text-sm text-text-secondary">{time}</span>
+        {!timeOnly && <span className="block text-[11px] text-text-secondary">{day}</span>}
       </span>
 
       {/* Three lines: retailer, reference, collection ID (the mobile number and settlement type are in the tooltip). */}

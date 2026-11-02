@@ -9,6 +9,8 @@ import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { StatusText } from "@/components/dashboard/StatusText";
+import { CopyButton } from "@/components/dashboard/CopyButton";
+import { shortCode } from "@/lib/reports/shortCode";
 import {
   amountTone,
   applyTransferActionPatch,
@@ -1209,8 +1211,11 @@ export function ReportView({
                       {listCodes.map((c) => {
                         const code = cellValue(c, row);
                         return code ? (
-                          <span key={c.key} className="block truncate font-mono text-[11px] text-text-secondary" title={`${c.label} ${code}`}>
-                            <span className="font-sans uppercase tracking-wide">{c.label}</span> {code}
+                          <span key={c.key} className="flex h-4 items-center gap-1 font-mono text-[11px] text-text-secondary" title={`${c.label} ${code}`}>
+                            <span className="truncate">
+                              <span className="font-sans uppercase tracking-wide">{c.label}</span> {shortCode(code)}
+                            </span>
+                            <CopyButton value={code} label={c.label} className="size-4" />
                           </span>
                         ) : null;
                       })}

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
+import { CopyButton } from "@/components/dashboard/CopyButton";
 import { StatusText } from "@/components/dashboard/StatusText";
+import { shortCode as short } from "@/lib/reports/shortCode";
 import { isCredit, mergeEntries, statementTotals, type BulkpeEntry } from "@/lib/admin/bulkpeStatement";
 import { cn } from "@/lib/cn";
 
@@ -62,11 +64,6 @@ function entryTitle(entry: BulkpeEntry): string {
   // Money in with an NPPG… reference is a card collection settling in (same references as the PG Tally).
   if (isCredit(entry)) return entry.holderName || (/^NPPG/i.test(entry.reference) ? "PG collection" : "Money in");
   return entry.holderName || entry.beneficiaryName || "Payout";
-}
-
-/** Long codes shortened to their first and last three characters ("HDFC0000128" → "HDF…128"); the full code stays in the tooltip. */
-function short(code: string): string {
-  return code.length > 8 ? `${code.slice(0, 3)}…${code.slice(-3)}` : code;
 }
 
 /** Second line: the account for payouts, the reference (e.g. the PG collection) for money in. */
@@ -133,12 +130,12 @@ function EntryRow({
 
   return (
     <li className={cn(failed && "bg-status-failed-bg/40", className)}>
-      <button
-        type="button"
+      {/* A div, not a button, so the copy buttons inside are not buttons within a button: a click anywhere on the row
+          opens it, and the name is the real button (Tab to it, Enter / Space) for keyboard users. */}
+      <div
         onClick={onToggle}
-        aria-expanded={open}
         // Narrow panels and phones (below @xl): no direction icon column, so the name gets the room.
-        className="grid h-[4.5rem] w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
+        className="grid h-[4.5rem] w-full cursor-pointer grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
       >
         {/* The BUL account this entry went through, above the time (and the date, when it isn't today). */}
         <span className="tabular-nums">
@@ -164,18 +161,37 @@ function EntryRow({
         </span>
 
         {/* Three lines: who, the account · IFSC (the reference for money in), then the UTR (or the bank's failure message). Codes are shortened: first and last three characters. */}
-        <span className="min-w-0 [&>span]:block [&>span]:truncate">
-          <span className="h-5 text-sm font-medium text-text-primary" title={entryTitle(entry)}>
+        <span className="min-w-0">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle();
+            }}
+            className="block h-5 w-full truncate text-left text-sm font-medium text-text-primary focus-visible:outline-2 focus-visible:outline-brand-primary"
+            title={entryTitle(entry)}
+          >
             {entryTitle(entry)}
+          </button>
+          {/* Account · IFSC, the IFSC shortened with a copy button for the full code. */}
+          <span className="flex h-4 items-center gap-1 font-mono text-[11px] text-text-secondary" title={entrySubtitle(entry)}>
+            <span className="truncate">{entrySubtitle(entry, true)}</span>
+            {!credit && <CopyButton value={entry.ifsc} label="IFSC" className="size-4" />}
           </span>
-          <span className="h-4 font-mono text-[11px] text-text-secondary" title={entrySubtitle(entry)}>
-            {entrySubtitle(entry, true)}
-          </span>
+          {/* UTR shortened with a copy button for the full number (or the bank's failure message). */}
           <span
-            className={cn("h-4 font-mono text-[11px]", failed ? "font-sans text-status-failed" : "text-text-secondary")}
+            className={cn("flex h-4 items-center gap-1 font-mono text-[11px]", failed ? "font-sans text-status-failed" : "text-text-secondary")}
             title={note}
           >
-            {failed ? note : entry.utr ? `UTR ${short(entry.utr)}` : ""}
+            {failed ? (
+              <span className="truncate">{note}</span>
+            ) : entry.utr ? (
+              <>
+                <span className="truncate">UTR {short(entry.utr)}</span>
+                <CopyButton value={entry.utr} label="UTR" className="size-4" />
+              </>
+            ) : null}
           </span>
         </span>
 
@@ -205,7 +221,7 @@ function EntryRow({
             <StatusText>{entry.status}</StatusText>
           </span>
         </span>
-      </button>
+      </div>
       {open && <EntryDetails entry={entry} />}
     </li>
   );
