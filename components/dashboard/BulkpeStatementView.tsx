@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
+import { StatusText } from "@/components/dashboard/StatusText";
 import { isCredit, mergeEntries, statementTotals, type BulkpeEntry } from "@/lib/admin/bulkpeStatement";
 import { cn } from "@/lib/cn";
 
@@ -38,25 +39,6 @@ const VIEWS = [
 ] as const;
 /** Dropdown ids for filtering by BUL account are "bul:" + the account ("bul:BUL 6752"). */
 const BUL_VIEW_PREFIX = "bul:";
-
-const STATUS_STYLES: Record<string, string> = {
-  SUCCESS: "bg-status-success-bg text-status-success",
-  PENDING: "bg-status-pending-bg text-status-pending",
-  FAILED: "bg-status-failed-bg text-status-failed",
-};
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
-        STATUS_STYLES[status.toUpperCase()] ?? "bg-brand-light text-text-secondary",
-      )}
-    >
-      {status}
-    </span>
-  );
-}
 
 // Vendor times are UTC; show them as Indian time whatever the browser's timezone.
 const IST = "Asia/Kolkata";
@@ -150,17 +132,17 @@ function EntryRow({
         onClick={onToggle}
         aria-expanded={open}
         // Narrow panels and phones (below @xl): no direction icon column, so the name gets the room.
-        className="grid min-h-[4.25rem] w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-1.5 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
+        className="grid h-[4.5rem] w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
       >
         <span className="tabular-nums">
           {!isToday && <span className="block text-[11px] text-text-secondary">{day}</span>}
-          <span className="block whitespace-nowrap text-sm text-text-primary">{time}</span>
+          <span className="block whitespace-nowrap text-sm text-text-secondary">{time}</span>
         </span>
 
         {/* Direction: money in (green, arrow down) or a payout (arrow up); red when it failed. */}
         <span
           className={cn(
-            "mt-0.5 hidden size-7 items-center justify-center rounded-full @xl:flex",
+            "hidden size-7 items-center justify-center rounded-full @xl:flex",
             failed ? "bg-status-failed-bg text-status-failed" : credit ? "bg-status-success-bg text-status-success" : "bg-brand-light text-brand-navy",
           )}
           title={failed ? "Failed: no money moved" : credit ? "Money in" : "Payout"}
@@ -171,71 +153,44 @@ function EntryRow({
           </svg>
         </span>
 
+        {/* Three single lines, never wrapped: who, BUL account · account, then the UTR (or the bank's failure message). */}
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium text-text-primary" title={entryTitle(entry)}>
             {entryTitle(entry)}
           </span>
-          {/* The BUL chip sits before the account line, so every row keeps the same three lines. */}
-          <span className="flex min-w-0 items-center gap-1.5">
-            {entry.bulAccount && (
-              <span
-                className="shrink-0 rounded-md bg-brand-light px-1.5 py-px font-mono text-[10px] font-semibold text-text-secondary"
-                title="BUL account this entry went through"
-              >
-                {entry.bulAccount}
-              </span>
-            )}
-            <span className="min-w-0 truncate font-mono text-[11px] text-text-secondary" title={entrySubtitle(entry)}>
-              {entrySubtitle(entry)}
-            </span>
+          <span className="block truncate text-xs text-text-secondary" title={[entry.bulAccount, entrySubtitle(entry)].filter(Boolean).join(" · ")}>
+            {entry.bulAccount && <span className="font-semibold text-brand-navy/80">{entry.bulAccount}</span>}
+            {entry.bulAccount && " · "}
+            <span className="font-mono text-[11px]">{entrySubtitle(entry)}</span>
           </span>
-          {note && (
-            <span
-              className={cn("block truncate text-[11px]", failed ? "text-status-failed" : "font-mono text-text-secondary")}
-              title={note}
-            >
-              {failed ? note : <><span className="font-sans uppercase tracking-wide">UTR</span> {entry.utr}</>}
-            </span>
-          )}
+          <span
+            className={cn("block h-4 truncate font-mono text-[11px]", failed ? "font-sans text-status-failed" : "text-text-secondary/80")}
+            title={note}
+          >
+            {failed ? note : entry.utr ? `UTR ${entry.utr}` : ""}
+          </span>
         </span>
 
+        {/* Amount, the payout's charge with its GST ("₹18.00 + ₹3.24 GST"; money in has none), then the status. */}
         <span className="flex flex-col items-end gap-0.5 text-right">
           <span
             className={cn(
               "whitespace-nowrap text-sm font-semibold tabular-nums",
               failed ? "text-text-secondary line-through" : credit ? "text-status-success" : "text-text-primary",
             )}
+            title={entry.closingBalance !== null ? `Balance after this entry: ${inr(entry.closingBalance)}` : undefined}
           >
             {credit ? "+" : "−"}
             {inr(entry.amount)}
           </span>
-          {entry.closingBalance !== null && (
-            <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Balance after this entry">
-              Bal {inr(entry.closingBalance)}
-            </span>
-          )}
-          {/* The payout's charge with the GST on it, "₹18.00 + ₹3.24 GST" (money in has none): beside the status
-              when the panel is wide enough (@sm), on a line of its own when it is narrow. */}
-          {entry.charge > 0 && (
-            <span
-              className="@sm:hidden whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
-              title={`Charges ${inr(entry.charge)} + GST ${inr(entry.gst)}`}
-            >
-              {inr(entry.charge)}
-              {entry.gst > 0 && ` + ${inr(entry.gst)} GST`}
-            </span>
-          )}
-          <span className="flex items-center justify-end gap-1.5">
-            {entry.charge > 0 && (
-              <span
-                className="hidden @sm:inline whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
-                title={`Charges ${inr(entry.charge)} + GST ${inr(entry.gst)}`}
-              >
-                {inr(entry.charge)}
-                {entry.gst > 0 && ` + ${inr(entry.gst)} GST`}
-              </span>
-            )}
-            <StatusBadge status={entry.status} />
+          <span
+            className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
+            title={entry.charge > 0 ? `Charges ${inr(entry.charge)} + GST ${inr(entry.gst)}` : undefined}
+          >
+            {entry.charge > 0 && `${inr(entry.charge)}${entry.gst > 0 ? ` + ${inr(entry.gst)} GST` : ""}`}
+          </span>
+          <span className="flex h-5 items-center">
+            <StatusText>{entry.status}</StatusText>
           </span>
         </span>
       </button>

@@ -8,6 +8,7 @@ import { clearDemoSession } from "@/lib/auth/demoSession";
 import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
+import { StatusText } from "@/components/dashboard/StatusText";
 import {
   amountTone,
   applyTransferActionPatch,
@@ -526,7 +527,9 @@ function TransferRowActions({
   row,
   pendingAction,
   onAction,
+  compact,
 }: {
+  compact?: boolean;
   row: ReportRow;
   pendingAction: { uniqueTxnId: string; action: TransferAction } | null;
   onAction: (action: TransferAction, uniqueTxnId: string, id: string) => void;
@@ -539,12 +542,12 @@ function TransferRowActions({
   if (!queued && !refundable) return null;
   const isPending = (action: TransferAction) => pendingAction?.uniqueTxnId === row.UniqueTxnId && pendingAction.action === action;
   return (
-    <span className="flex flex-wrap justify-end gap-1">
-      {queued && <TransferActionButton action="dequeue" pending={isPending("dequeue")} onClick={() => onAction("dequeue", row.UniqueTxnId, id)} />}
+    <span className={cn("flex justify-end gap-1", !compact && "flex-wrap")}>
+      {queued && <TransferActionButton action="dequeue" pending={isPending("dequeue")} onClick={() => onAction("dequeue", row.UniqueTxnId, id)} compact={compact} />}
       {refundable && (
         <>
-          <TransferActionButton action="enqueue" pending={isPending("enqueue")} onClick={() => onAction("enqueue", row.UniqueTxnId, id)} />
-          <TransferActionButton action="refund" pending={isPending("refund")} onClick={() => onAction("refund", row.UniqueTxnId, id)} />
+          <TransferActionButton action="enqueue" pending={isPending("enqueue")} onClick={() => onAction("enqueue", row.UniqueTxnId, id)} compact={compact} />
+          <TransferActionButton action="refund" pending={isPending("refund")} onClick={() => onAction("refund", row.UniqueTxnId, id)} compact={compact} />
         </>
       )}
     </span>
@@ -555,7 +558,9 @@ function TransferActionButton({
   action,
   pending,
   onClick,
+  compact,
 }: {
+  compact?: boolean;
   action: TransferAction;
   pending: boolean;
   onClick: () => void;
@@ -568,7 +573,10 @@ function TransferActionButton({
       disabled={pending}
       aria-label={ariaLabel}
       title={ariaLabel}
-      className="inline-flex items-center gap-1.5 rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50"
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-50",
+        compact && "px-1.5 py-0 text-[11px]",
+      )}
     >
       <svg
         width="12"
@@ -1177,9 +1185,9 @@ export function ReportView({
                 return (
                   <li
                     key={currentPage * PAGE_SIZE + i}
-                    className="grid min-h-[4.25rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-1.5 transition-colors hover:bg-brand-light/40"
+                    className="grid h-[4.5rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 transition-colors hover:bg-brand-light/40"
                   >
-                    <span className="whitespace-nowrap text-sm tabular-nums text-text-primary">{listTime(row)}</span>
+                    <span className="whitespace-nowrap text-sm tabular-nums text-text-secondary">{listTime(row)}</span>
                     <span className="min-w-0">
                       {listTitle && (
                         <span className="block truncate text-sm font-medium text-text-primary" title={cellValue(listTitle, row)}>
@@ -1191,26 +1199,25 @@ export function ReportView({
                           {details.join(" · ")}
                         </span>
                       )}
+                      {details.length === 0 && <span className="block h-4" />}
                       {listCodes.map((c) => {
                         const code = cellValue(c, row);
                         return code ? (
-                          <span key={c.key} className="block truncate font-mono text-[11px] text-text-secondary" title={`${c.label} ${code}`}>
+                          <span key={c.key} className="block truncate font-mono text-[11px] text-text-secondary/80" title={`${c.label} ${code}`}>
                             <span className="font-sans uppercase tracking-wide">{c.label}</span> {code}
                           </span>
                         ) : null;
                       })}
                     </span>
                     <span className="flex flex-col items-end gap-0.5">
-                      {amount && <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{formatAmount(amount)}</span>}
-                      {listCharge && Number(cellValue(listCharge, row)) > 0 && (
-                        <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Transfer charges">
-                          Charges {formatAmount(cellValue(listCharge, row))}
-                        </span>
-                      )}
-                      {/* Last line: the status with the Dequeue / Enqueue + Refund buttons beside it. */}
-                      <span className="flex flex-wrap items-center justify-end gap-1">
-                        {listStatus && <Cell column={listStatus} row={row} variant="table" />}
-                        {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} />}
+                      <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{amount ? formatAmount(amount) : "—"}</span>
+                      <span className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Transfer charges">
+                        {listCharge && Number(cellValue(listCharge, row)) > 0 && `Charges ${formatAmount(cellValue(listCharge, row))}`}
+                      </span>
+                      {/* Last line: the status as a quiet word, with the Dequeue / Enqueue + Refund buttons beside it. */}
+                      <span className="flex h-5 items-center justify-end gap-2">
+                        {listStatus && <StatusText>{cellValue(listStatus, row)}</StatusText>}
+                        {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} compact />}
                       </span>
                     </span>
                   </li>

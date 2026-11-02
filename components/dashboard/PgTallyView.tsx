@@ -11,6 +11,7 @@ import {
   type TallyCheck,
 } from "@/lib/admin/pgTally";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
+import { StatusText, statusTone } from "@/components/dashboard/StatusText";
 import { toIsoDate } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
 
@@ -295,44 +296,53 @@ function TallyRow({
   const canCheck = row.canRefresh && !!row.referenceNumber && !!row.collectionId;
   const showMobile = !!row.userName && row.userName !== row.vendorName;
   const refs = [row.referenceNumber, row.collectionId !== row.referenceNumber ? row.collectionId : ""].filter(Boolean);
+  const check = tallyCheck(row);
+  const wallet = showWallet ? WALLET[check] : null;
+  const credited = row.walletCreditCount > 0 && row.walletCreditTime ? dateParts(row.walletCreditTime) : null;
+  const meta = [showMobile ? row.userName : "", row.settlementType].filter(Boolean).join(" · ");
   return (
     <li
       className={cn(
-        "grid min-h-[4.25rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-3 py-1.5",
+        "grid h-[4.5rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
         issue && "bg-status-failed-bg/40",
         className,
       )}
     >
       <span className="tabular-nums">
         {!timeOnly && <span className="block text-[11px] text-text-secondary">{day}</span>}
-        <span className="block whitespace-nowrap text-sm text-text-primary">{time}</span>
+        <span className="block whitespace-nowrap text-sm text-text-secondary">{time}</span>
       </span>
 
-      {/* Retailer: name, mobile number, then the reference and collection ID — wrapped, never cut off. */}
+      {/* Three single lines, never wrapped: retailer, mobile · settlement, then the references. */}
       <span className="min-w-0">
         <span className="block truncate text-sm font-medium text-text-primary" title={row.vendorName}>
           {row.vendorName}
         </span>
-        {(showMobile || row.settlementType) && (
-          <span className="block text-[11px] text-text-secondary">
-            {showMobile && <span className="font-mono">{row.userName}</span>}
-            {showMobile && row.settlementType && " · "}
-            {row.settlementType && <span title="Settlement type">{row.settlementType}</span>}
-          </span>
-        )}
-        <span className="block font-mono text-[11px] text-text-secondary wrap-anywhere">{refs.join(" · ")}</span>
+        <span className="block truncate text-xs text-text-secondary" title={meta}>
+          {meta || "—"}
+        </span>
+        <span className="block truncate font-mono text-[11px] text-text-secondary/80" title={refs.join(" · ")}>
+          {refs.join(" · ")}
+        </span>
       </span>
 
-      {/* Money and state in three lines: credited amount, the fee, then status with the wallet badge (or the status check) beside it. */}
+      {/* Credited amount, the fee, then where the collection stands. */}
       <span className="flex flex-col items-end gap-0.5 text-right">
         <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
         <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title={`${inr(row.debitFromCard)} charged to the card − ${inr(row.charges)} fee`}>
           − {inr(row.charges)} fee
         </span>
-        <span className="flex items-center justify-end gap-1">
-          <StatusBadge status={row.status} />
-          {showWallet && WALLET[tallyCheck(row)] && <WalletBadge row={row} inline />}
-          {canCheck && <RefreshButton busy={checking} onClick={onCheck} className="py-0.5" />}
+        <span className="flex h-5 items-center justify-end gap-2">
+          <StatusText tone={statusTone(row.status)}>{row.status}</StatusText>
+          {wallet && (
+            <span
+              className={cn("whitespace-nowrap text-[11px] font-medium", check === "ok" ? "text-status-success" : "text-status-failed")}
+              title={credited ? `Credited to the wallet ${credited.day}, ${credited.time}` : undefined}
+            >
+              {check === "ok" ? "✓ Credited" : wallet.text}
+            </span>
+          )}
+          {canCheck && <RefreshButton busy={checking} onClick={onCheck} className="px-1.5 py-0 text-[11px]" />}
         </span>
       </span>
     </li>
