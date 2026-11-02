@@ -338,8 +338,8 @@ export function BulkpeStatementView() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
-        {/* Toolbar, one line: filter dropdown, then search */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-brand-border px-3 py-2.5">
+        {/* Toolbar, the same two rows in all three admin panels: filters, then search */}
+        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-brand-border px-3 py-2.5">
           <FilterSelect
             id="bulkpe-filter"
             label="Show"
@@ -349,7 +349,7 @@ export function BulkpeStatementView() {
               setMobileLimit(MOBILE_PAGE);
             }}
             disabled={!ready}
-            className="w-36 shrink-0"
+            className="col-span-2"
             options={[
               ...VIEWS.map((v) => ({
                 id: v.id,
@@ -366,7 +366,7 @@ export function BulkpeStatementView() {
             ]}
           />
 
-          <div className="relative min-w-0 flex-1 basis-32">
+          <div className="relative col-span-2 min-w-0">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"

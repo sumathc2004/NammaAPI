@@ -988,7 +988,11 @@ export function ReportView({
         */}
         <div
           ref={toolbarRef}
-          className="flex shrink-0 scroll-mt-3 flex-wrap items-center gap-2 md:border-b md:border-brand-border md:px-3 md:py-2.5"
+          className={cn(
+            "shrink-0 scroll-mt-3 gap-2 md:border-b md:border-brand-border md:px-3 md:py-2.5",
+            // Compact panel: the same two rows as PG Tally and Bulkpe — filter | Export, then search | pager.
+            compact ? "grid grid-cols-[minmax(0,1fr)_auto] items-center" : "flex flex-wrap items-center",
+          )}
         >
           {views && compact && (
             <FilterSelect
@@ -1000,7 +1004,7 @@ export function ReportView({
                 setPage(0);
               }}
               disabled={!table}
-              className="w-36 shrink-0"
+              className="order-1"
               options={views.map((view) => ({
                 id: view.id,
                 label: view.label,
@@ -1047,7 +1051,7 @@ export function ReportView({
               })}
             </div>
           )}
-          <div className={cn("relative min-w-0 flex-1", compact ? "basis-28" : "order-2 md:w-56 md:flex-none xl:w-72")}>
+          <div className={cn("relative min-w-0 flex-1", compact ? "order-3" : "order-2 md:w-56 md:flex-none xl:w-72")}>
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"
@@ -1084,7 +1088,7 @@ export function ReportView({
                 total={filteredRows.length}
                 onPage={goToPage}
                 compact={compact}
-                className={cn("ml-auto", !compact && "md:order-4")}
+                className={cn("ml-auto", compact ? "order-4" : "md:order-4")}
               />
             </div>
           )}
@@ -1095,7 +1099,7 @@ export function ReportView({
             title="Export CSV"
             className={cn(
               "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-brand-border bg-white text-sm font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-40 disabled:hover:border-brand-border disabled:hover:text-text-primary",
-              compact ? "w-9 justify-center" : "order-3 px-2.5 md:order-5 md:px-3",
+              compact ? "order-2 w-9 justify-center" : "order-3 px-2.5 md:order-5 md:px-3",
             )}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

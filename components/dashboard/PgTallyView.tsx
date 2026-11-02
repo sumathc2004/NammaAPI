@@ -468,25 +468,23 @@ export function PgTallyView() {
 
       {/* The box: from tablet up it fills the panel and the list scrolls inside; phones let it grow with the page. */}
       <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
-        {/* Toolbar, one line when it fits: retailer, status filter, search */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-brand-border px-3 py-2.5">
-          <label htmlFor="pg-tally-retailer" className="sr-only">
-            Retailer
-          </label>
-          <select
+        {/* Toolbar, the same two rows in all three admin panels: filters, then search */}
+        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-brand-border px-3 py-2.5">
+          <FilterSelect
             id="pg-tally-retailer"
+            label="Retailer"
             value={retailer}
-            onChange={(e) => setRetailer(e.target.value)}
+            onChange={setRetailer}
             disabled={!ready || rows.length === 0}
-            className={cn(inputClasses, "min-w-0 flex-1 basis-36 truncate pr-8 @3xl:max-w-56")}
-          >
-            <option value="">All retailers ({rows.length})</option>
-            {retailers.map((g) => (
-              <option key={g.userName || g.vendorName} value={g.userName || g.vendorName}>
-                {g.vendorName} ({g.totals.count}){g.totals.issues > 0 ? ` · ${g.totals.issues} to check` : ""}
-              </option>
-            ))}
-          </select>
+            options={[
+              { id: "", label: "All retailers", count: rows.length },
+              ...retailers.map((g) => ({
+                id: g.userName || g.vendorName,
+                label: `${g.vendorName}${g.totals.issues > 0 ? ` · ${g.totals.issues} to check` : ""}`,
+                count: g.totals.count,
+              })),
+            ]}
+          />
 
           <FilterSelect
             id="pg-tally-filter"
@@ -494,7 +492,7 @@ export function PgTallyView() {
             value={viewId}
             onChange={(id) => setViewId(id as ViewId)}
             disabled={!ready || rows.length === 0}
-            className="w-36 shrink-0"
+            className="w-36"
             options={VIEWS.map((v) => ({
               id: v.id,
               label: v.label,
@@ -503,7 +501,7 @@ export function PgTallyView() {
             }))}
           />
 
-          <div className="relative min-w-0 flex-1 basis-32">
+          <div className="relative col-span-2 min-w-0">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"
