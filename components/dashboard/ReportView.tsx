@@ -8,6 +8,7 @@ import { clearDemoSession } from "@/lib/auth/demoSession";
 import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
+import { RowTime } from "@/components/dashboard/RowTime";
 import { StatusText } from "@/components/dashboard/StatusText";
 import { CopyButton } from "@/components/dashboard/CopyButton";
 import { shortCode } from "@/lib/reports/shortCode";
@@ -992,8 +993,8 @@ export function ReportView({
           ref={toolbarRef}
           className={cn(
             "shrink-0 scroll-mt-3 gap-2 md:border-b md:border-brand-border md:px-3 md:py-2.5",
-            // Compact panel: the same two rows as PG Tally and Bulkpe — filter | Export, then search | pager.
-            compact ? "grid grid-cols-[minmax(0,1fr)_auto] items-center" : "flex flex-wrap items-center",
+            // Compact panel: one line like PG Tally and Bulkpe — filter, search, pager, Export (wraps only when narrow).
+            compact ? "flex flex-wrap items-center @md:flex-nowrap" : "flex flex-wrap items-center",
           )}
         >
           {views && compact && (
@@ -1006,7 +1007,7 @@ export function ReportView({
                 setPage(0);
               }}
               disabled={!table}
-              className="order-1"
+              className="order-1 w-32 shrink-0"
               options={views.map((view) => ({
                 id: view.id,
                 label: view.label,
@@ -1053,7 +1054,7 @@ export function ReportView({
               })}
             </div>
           )}
-          <div className={cn("relative min-w-0 flex-1", compact ? "order-3" : "order-2 md:w-56 md:flex-none xl:w-72")}>
+          <div className={cn("relative min-w-0 flex-1", compact ? "order-2 basis-28" : "order-2 md:w-56 md:flex-none xl:w-72")}>
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"
@@ -1090,7 +1091,7 @@ export function ReportView({
                 total={filteredRows.length}
                 onPage={goToPage}
                 compact={compact}
-                className={cn("ml-auto", compact ? "order-4" : "md:order-4")}
+                className={cn("ml-auto", compact ? "order-4 @md:order-3" : "md:order-4")}
               />
             </div>
           )}
@@ -1101,7 +1102,7 @@ export function ReportView({
             title="Export CSV"
             className={cn(
               "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-brand-border bg-white text-sm font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-40 disabled:hover:border-brand-border disabled:hover:text-text-primary",
-              compact ? "order-2 w-9 justify-center" : "order-3 px-2.5 md:order-5 md:px-3",
+              compact ? "order-3 w-9 justify-center @md:order-4" : "order-3 px-2.5 md:order-5 md:px-3",
             )}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1194,14 +1195,7 @@ export function ReportView({
                     className="grid h-[4.5rem] grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 transition-colors hover:bg-brand-light/40"
                   >
                     {/* Vendor and shop (e.g. "bulkpe", "Tamilpay") above the time. */}
-                    <span className="min-w-0 tabular-nums">
-                      {details.slice(0, 2).map((text, n) => (
-                        <span key={n} className="block truncate text-[11px] font-semibold leading-4 text-brand-navy/80" title={text}>
-                          {text}
-                        </span>
-                      ))}
-                      <span className="block whitespace-nowrap text-sm text-text-secondary">{listTime(row)}</span>
-                    </span>
+                    <RowTime label={details[0]} sub={details[1]} time={listTime(row)} />
                     <span className="min-w-0">
                       {listTitle && (
                         <span className="block truncate text-sm font-medium text-text-primary" title={cellValue(listTitle, row)}>

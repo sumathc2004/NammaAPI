@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { CopyButton } from "@/components/dashboard/CopyButton";
+import { RowTime } from "@/components/dashboard/RowTime";
 import { StatusText } from "@/components/dashboard/StatusText";
 import { shortCode as short } from "@/lib/reports/shortCode";
 import { isCredit, mergeEntries, statementTotals, type BulkpeEntry } from "@/lib/admin/bulkpeStatement";
@@ -135,16 +136,10 @@ function EntryRow({
       <div
         onClick={onToggle}
         // Narrow panels and phones (below @xl): no direction icon column, so the name gets the room.
-        className="grid h-[4.5rem] w-full cursor-pointer grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
+        className="grid h-[4.5rem] w-full cursor-pointer grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[4.5rem_1.75rem_minmax(0,1fr)_auto]"
       >
         {/* The BUL account this entry went through, above the time (and the date, when it isn't today). */}
-        <span className="tabular-nums">
-          <span className="block h-4 truncate text-[11px] font-semibold text-brand-navy/80" title="BUL account this entry went through">
-            {entry.bulAccount}
-          </span>
-          <span className="block whitespace-nowrap text-sm text-text-secondary">{time}</span>
-          {!isToday && <span className="block text-[11px] text-text-secondary">{day}</span>}
-        </span>
+        <RowTime label={entry.bulAccount} time={time} day={isToday ? undefined : day} />
 
         {/* Direction: money in (green, arrow down) or a payout (arrow up); red when it failed. */}
         <span
@@ -365,8 +360,8 @@ export function BulkpeStatementView() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
-        {/* Toolbar, the same two rows in all three admin panels: filters, then search */}
-        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-brand-border px-3 py-2.5">
+        {/* Toolbar, one line in all three admin panels (wraps only when the panel is narrow): filter, then search */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-brand-border px-3 py-2.5 @md:flex-nowrap">
           <FilterSelect
             id="bulkpe-filter"
             label="Show"
@@ -376,7 +371,7 @@ export function BulkpeStatementView() {
               setMobileLimit(MOBILE_PAGE);
             }}
             disabled={!ready}
-            className="col-span-2"
+            className="w-36 shrink-0"
             options={[
               ...VIEWS.map((v) => ({
                 id: v.id,
@@ -393,7 +388,7 @@ export function BulkpeStatementView() {
             ]}
           />
 
-          <div className="relative col-span-2 min-w-0">
+          <div className="relative min-w-0 flex-1 basis-28">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"

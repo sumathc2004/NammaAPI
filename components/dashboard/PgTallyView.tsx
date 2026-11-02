@@ -11,6 +11,7 @@ import {
   type TallyCheck,
 } from "@/lib/admin/pgTally";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
+import { RowTime } from "@/components/dashboard/RowTime";
 import { StatusText, statusTone } from "@/components/dashboard/StatusText";
 import { toIsoDate } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
@@ -308,13 +309,7 @@ function TallyRow({
       )}
     >
       {/* The settlement type ("Wallet Instant") above the time (and the date, when it isn't today). */}
-      <span className="min-w-0 tabular-nums">
-        <span className="block h-4 truncate text-[11px] font-semibold text-brand-navy/80" title="Settlement type">
-          {row.settlementType}
-        </span>
-        <span className="block whitespace-nowrap text-sm text-text-secondary">{time}</span>
-        {!timeOnly && <span className="block text-[11px] text-text-secondary">{day}</span>}
-      </span>
+      <RowTime label={row.settlementType} time={time} day={timeOnly ? undefined : day} />
 
       {/* Three lines: retailer, reference, collection ID (the mobile number and settlement type are in the tooltip). */}
       <span className="min-w-0 [&>span]:block [&>span]:truncate">
@@ -468,14 +463,15 @@ export function PgTallyView() {
 
       {/* The box: from tablet up it fills the panel and the list scrolls inside; phones let it grow with the page. */}
       <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
-        {/* Toolbar, the same two rows in all three admin panels: filters, then search */}
-        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-brand-border px-3 py-2.5">
+        {/* Toolbar, one line in all three admin panels (wraps only when the panel is narrow): filters, then search */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-brand-border px-3 py-2.5 @md:flex-nowrap">
           <FilterSelect
             id="pg-tally-retailer"
             label="Retailer"
             value={retailer}
             onChange={setRetailer}
             disabled={!ready || rows.length === 0}
+            className="min-w-0 flex-1 basis-36"
             options={[
               { id: "", label: "All retailers", count: rows.length },
               ...retailers.map((g) => ({
@@ -492,7 +488,7 @@ export function PgTallyView() {
             value={viewId}
             onChange={(id) => setViewId(id as ViewId)}
             disabled={!ready || rows.length === 0}
-            className="w-36"
+            className="w-28 shrink-0"
             options={VIEWS.map((v) => ({
               id: v.id,
               label: v.label,
@@ -501,7 +497,7 @@ export function PgTallyView() {
             }))}
           />
 
-          <div className="relative col-span-2 min-w-0">
+          <div className="relative min-w-0 flex-1 basis-28">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
               viewBox="0 0 24 24"
