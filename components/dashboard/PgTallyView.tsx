@@ -295,7 +295,6 @@ function TallyRow({
   const showWallet = !(row.canRefresh && !WALLET[tallyCheck(row)]);
   const canCheck = row.canRefresh && !!row.referenceNumber && !!row.collectionId;
   const showMobile = !!row.userName && row.userName !== row.vendorName;
-  const refs = [row.referenceNumber, row.collectionId !== row.referenceNumber ? row.collectionId : ""].filter(Boolean);
   const check = tallyCheck(row);
   const wallet = showWallet ? WALLET[check] : null;
   const credited = row.walletCreditCount > 0 && row.walletCreditTime ? dateParts(row.walletCreditTime) : null;
@@ -303,7 +302,7 @@ function TallyRow({
   return (
     <li
       className={cn(
-        "grid h-[4.5rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
+        "grid h-[5.5rem] grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4",
         issue && "bg-status-failed-bg/40",
         className,
       )}
@@ -313,33 +312,33 @@ function TallyRow({
         <span className="block whitespace-nowrap text-sm text-text-secondary">{time}</span>
       </span>
 
-      {/* Three single lines, never wrapped: retailer, mobile · settlement, then the references. */}
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-medium text-text-primary" title={row.vendorName}>
+      {/* Four lines, each on its own so nothing is cut off: retailer, mobile · settlement, reference, collection ID. */}
+      <span className="min-w-0 [&>span]:block [&>span]:truncate">
+        <span className="h-5 text-sm font-medium text-text-primary" title={row.vendorName}>
           {row.vendorName}
         </span>
-        <span className="block truncate text-xs text-text-secondary" title={meta}>
-          {meta || "—"}
-        </span>
-        <span className="block truncate font-mono text-[11px] text-text-secondary/80" title={refs.join(" · ")}>
-          {refs.join(" · ")}
-        </span>
+        <span className="h-4 text-xs text-text-secondary">{meta}</span>
+        <span className="h-4 font-mono text-[11px] text-text-secondary/80">{row.referenceNumber}</span>
+        <span className="h-4 font-mono text-[11px] text-text-secondary/80">{row.collectionId !== row.referenceNumber ? row.collectionId : ""}</span>
       </span>
 
-      {/* Credited amount, the fee, then where the collection stands. */}
-      <span className="flex flex-col items-end gap-0.5 text-right">
-        <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
-        <span className="whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title={`${inr(row.debitFromCard)} charged to the card − ${inr(row.charges)} fee`}>
+      {/* Four lines: credited amount, the fee, the status, then the wallet credit (or the status check). */}
+      <span className="flex flex-col items-end text-right [&>span]:flex [&>span]:items-center [&>span]:justify-end">
+        <span className="h-5 whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">{inr(row.amount)}</span>
+        <span className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title={`${inr(row.debitFromCard)} charged to the card − ${inr(row.charges)} fee`}>
           − {inr(row.charges)} fee
         </span>
-        <span className="flex h-5 items-center justify-end gap-2">
+        <span className="h-4">
           <StatusText tone={statusTone(row.status)}>{row.status}</StatusText>
+        </span>
+        <span className="h-5 gap-2">
           {wallet && (
             <span
               className={cn("whitespace-nowrap text-[11px] font-medium", check === "ok" ? "text-status-success" : "text-status-failed")}
               title={credited ? `Credited to the wallet ${credited.day}, ${credited.time}` : undefined}
             >
               {check === "ok" ? "✓ Credited" : wallet.text}
+              {credited && <span className="ml-1 font-normal text-text-secondary">{credited.time}</span>}
             </span>
           )}
           {canCheck && <RefreshButton busy={checking} onClick={onCheck} className="px-1.5 py-0 text-[11px]" />}

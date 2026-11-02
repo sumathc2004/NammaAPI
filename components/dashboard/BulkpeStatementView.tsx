@@ -132,7 +132,7 @@ function EntryRow({
         onClick={onToggle}
         aria-expanded={open}
         // Narrow panels and phones (below @xl): no direction icon column, so the name gets the room.
-        className="grid h-[4.5rem] w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
+        className="grid h-[5.5rem] w-full grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 text-left transition-colors hover:bg-brand-light/50 @xl:grid-cols-[3.75rem_1.75rem_minmax(0,1fr)_auto]"
       >
         <span className="tabular-nums">
           {!isToday && <span className="block text-[11px] text-text-secondary">{day}</span>}
@@ -153,35 +153,36 @@ function EntryRow({
           </svg>
         </span>
 
-        {/* Three single lines, never wrapped: who, BUL account · account, then the UTR (or the bank's failure message). */}
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium text-text-primary" title={entryTitle(entry)}>
+        {/* Four lines: who, the BUL account, the account · IFSC (or the reference for money in), then the UTR (or the bank's failure message). */}
+        <span className="min-w-0 [&>span]:block [&>span]:truncate">
+          <span className="h-5 text-sm font-medium text-text-primary" title={entryTitle(entry)}>
             {entryTitle(entry)}
           </span>
-          <span className="block truncate text-xs text-text-secondary" title={[entry.bulAccount, entrySubtitle(entry)].filter(Boolean).join(" · ")}>
-            {entry.bulAccount && <span className="font-semibold text-brand-navy/80">{entry.bulAccount}</span>}
-            {entry.bulAccount && " · "}
-            <span className="font-mono text-[11px]">{entrySubtitle(entry)}</span>
+          <span className="h-4 text-xs font-semibold text-brand-navy/80">{entry.bulAccount}</span>
+          <span className="h-4 font-mono text-[11px] text-text-secondary" title={entrySubtitle(entry)}>
+            {entrySubtitle(entry)}
           </span>
           <span
-            className={cn("block h-4 truncate font-mono text-[11px]", failed ? "font-sans text-status-failed" : "text-text-secondary/80")}
+            className={cn("h-4 font-mono text-[11px]", failed ? "font-sans text-status-failed" : "text-text-secondary/80")}
             title={note}
           >
             {failed ? note : entry.utr ? `UTR ${entry.utr}` : ""}
           </span>
         </span>
 
-        {/* Amount, the payout's charge with its GST ("₹18.00 + ₹3.24 GST"; money in has none), then the status. */}
-        <span className="flex flex-col items-end gap-0.5 text-right">
+        {/* Four lines: amount, the balance after it, the payout's charge with its GST (money in has none), then the status. */}
+        <span className="flex flex-col items-end text-right [&>span]:flex [&>span]:items-center [&>span]:justify-end">
           <span
             className={cn(
-              "whitespace-nowrap text-sm font-semibold tabular-nums",
+              "h-5 whitespace-nowrap text-sm font-semibold tabular-nums",
               failed ? "text-text-secondary line-through" : credit ? "text-status-success" : "text-text-primary",
             )}
-            title={entry.closingBalance !== null ? `Balance after this entry: ${inr(entry.closingBalance)}` : undefined}
           >
             {credit ? "+" : "−"}
             {inr(entry.amount)}
+          </span>
+          <span className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary" title="Balance after this entry">
+            {entry.closingBalance !== null && `Bal ${inr(entry.closingBalance)}`}
           </span>
           <span
             className="h-4 whitespace-nowrap text-[11px] tabular-nums text-text-secondary"
@@ -189,7 +190,7 @@ function EntryRow({
           >
             {entry.charge > 0 && `${inr(entry.charge)}${entry.gst > 0 ? ` + ${inr(entry.gst)} GST` : ""}`}
           </span>
-          <span className="flex h-5 items-center">
+          <span className="h-4">
             <StatusText>{entry.status}</StatusText>
           </span>
         </span>
