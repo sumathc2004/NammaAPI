@@ -39,12 +39,14 @@ export function StatusText({ children, tone, title, className }: { children: str
 }
 
 /**
- * Background for a whole row by its status: pending / in queue get an amber tile with an amber edge, failed
- * (or `flagged`, e.g. a tally problem) a red one; everything else stays plain.
+ * Background for a whole row by its status, with a coloured left edge: success green, pending / in queue amber,
+ * failed (or `flagged`, e.g. a tally problem) red, refunded blue; anything else stays plain.
  */
 export function rowTint(status: string, flagged = false): string {
   const tone = flagged ? "failed" : statusTone(status);
+  if (tone === "success") return "bg-emerald-50/70 shadow-[inset_3px_0_0_0_#34d399] hover:bg-emerald-100/50";
   if (tone === "pending") return "bg-amber-50 shadow-[inset_3px_0_0_0_#fbbf24] hover:bg-amber-100/60";
   if (tone === "failed") return "bg-red-50/70 shadow-[inset_3px_0_0_0_#f87171]";
+  if (tone === "info") return "bg-sky-50/70 shadow-[inset_3px_0_0_0_#38bdf8] hover:bg-sky-100/50";
   return "";
 }
