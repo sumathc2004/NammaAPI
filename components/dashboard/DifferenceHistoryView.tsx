@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DatePicker } from "@/components/dashboard/DatePicker";
-import { snapshotChanges, type BalanceSnapshot } from "@/lib/admin/apiBalance";
+import type { BalanceSnapshot } from "@/lib/admin/apiBalance";
+import { downloadHistoryPdf, historyRows, toHistoryCsv } from "@/lib/admin/balanceHistoryExport";
 import { DEFAULT_DASHBOARD_PATH, getDashboardSection } from "@/lib/data/dashboardNav";
 import { REPORTS_START_DATE, toIsoDate } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
@@ -53,6 +54,17 @@ function defaultRange(): Range {
   return { from: from < REPORTS_START_DATE ? REPORTS_START_DATE : from, to: toIsoDate(today) };
 }
 
+const exportButton =
+  "inline-flex h-9 items-center gap-1.5 rounded-lg border border-brand-border bg-white px-3 text-sm font-medium text-text-primary transition-colors hover:border-brand-primary hover:text-brand-primary disabled:opacity-40 disabled:hover:border-brand-border disabled:hover:text-text-primary";
+
+function DownloadIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+    </svg>
+  );
+}
+
 function DeltaChip({ label, delta }: { label: string; delta: number }) {
   return (
     <span
@@ -93,6 +105,28 @@ export function DifferenceHistoryView() {
   }, [range]);
 
   const snapshots = state.status === "ready" ? state.snapshots : [];
+  const [exporting, setExporting] = useState(false);
+  const fileBase = `difference-history_${range.from}_to_${range.to}`;
+
+  function exportExcel() {
+    // The byte order mark makes Excel read the file as UTF-8; the numbers are plain, so Excel can sum them.
+    const blob = new Blob(["﻿", toHistoryCsv(snapshots)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileBase}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportPdf() {
+    setExporting(true);
+    try {
+      await downloadHistoryPdf(snapshots, range, `${fileBase}.pdf`);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
@@ -142,9 +176,19 @@ export function DifferenceHistoryView() {
           Apply
         </button>
         {state.status === "ready" && (
-          <p className="ml-auto text-xs tabular-nums text-text-secondary">
-            {snapshots.length} snapshot{snapshots.length === 1 ? "" : "s"}
-          </p>
+          <div className="ml-auto flex items-center gap-2">
+            <p className="text-xs tabular-nums text-text-secondary">
+              {snapshots.length} snapshot{snapshots.length === 1 ? "" : "s"}
+            </p>
+            <button type="button" onClick={exportExcel} disabled={snapshots.length === 0} title="Download as an Excel-ready CSV file" className={exportButton}>
+              <DownloadIcon />
+              Excel
+            </button>
+            <button type="button" onClick={exportPdf} disabled={snapshots.length === 0 || exporting} title="Download as a PDF" className={exportButton}>
+              <DownloadIcon />
+              {exporting ? "Making PDF…" : "PDF"}
+            </button>
+          </div>
         )}
       </form>
 
@@ -169,11 +213,9 @@ export function DifferenceHistoryView() {
 
         {state.status === "ready" && snapshots.length > 0 && (
           <ul className="divide-y divide-brand-border/70" aria-label="Difference history">
-            {snapshots.map((snapshot, i) => {
-              const older = snapshots[i + 1];
+            {historyRows(snapshots).map(({ snapshot, diffMoved, changes }, i, all) => {
+              const older = all[i + 1]?.snapshot;
               const { day, time } = when(snapshot.at);
-              const diffMoved = older && snapshot.diff !== null && older.diff !== null ? Math.round((snapshot.diff - older.diff) * 100) / 100 : null;
-              const changes = older ? snapshotChanges(snapshot, older) : [];
               return (
                 <li key={snapshot.id || snapshot.at} className="grid gap-x-4 gap-y-1.5 px-5 py-3 sm:grid-cols-[8.5rem_11rem_minmax(0,1fr)]">
                   <div className="tabular-nums">
