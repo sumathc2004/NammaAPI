@@ -29,14 +29,14 @@ const csvCell = (value: string) => (/[",\r\n]/.test(value) ? `"${value.replace(/
  * snapshot, plain numbers Excel can sum or chart — the difference, how much it moved, the API wallet and one
  * column per balance — then a text column saying what moved.
  */
-export function toHistoryCsv(snapshots: BalanceSnapshot[]): string {
+export function toHistoryCsv(snapshots: BalanceSnapshot[], oldestFirst = false): string {
   const rows = historyRows(snapshots);
   const accounts: { key: string; label: string }[] = [];
   for (const { snapshot } of rows) {
     for (const a of snapshot.accounts) if (!accounts.some((x) => x.key === a.key)) accounts.push({ key: a.key, label: a.label });
   }
   const header = ["Snapshot ID", "Date & time", "Difference", "Change since previous", "API wallet", ...accounts.map((a) => a.label), "What moved"];
-  const lines = rows.map(({ snapshot, diffMoved, changes }) => {
+  const lines = (oldestFirst ? [...rows].reverse() : rows).map(({ snapshot, diffMoved, changes }) => {
     const byKey = new Map(snapshot.accounts.map((a) => [a.key, a.amount]));
     return [
       String(snapshot.id),
@@ -56,7 +56,7 @@ const rupees = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits:
 const signedRupees = (n: number) => `${n > 0 ? "+" : "-"}${rupees(Math.abs(n))}`;
 
 /** Downloads the history as a landscape A4 PDF table. */
-export async function downloadHistoryPdf(snapshots: BalanceSnapshot[], range: { from: string; to: string }, fileName: string) {
+export async function downloadHistoryPdf(snapshots: BalanceSnapshot[], range: { from: string; to: string }, fileName: string, oldestFirst = false) {
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
@@ -66,13 +66,13 @@ export async function downloadHistoryPdf(snapshots: BalanceSnapshot[], range: { 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(90);
-  doc.text(`NammaAPI - saved balance snapshots from ${range.from} to ${range.to} (newest first, ${snapshots.length} shown). Amounts in Rs.`, 40, 56);
+  doc.text(`NammaAPI - saved balance snapshots from ${range.from} to ${range.to} (${oldestFirst ? "oldest" : "newest"} first, ${snapshots.length} shown). Amounts in Rs.`, 40, 56);
 
   const rows = historyRows(snapshots);
   autoTable(doc, {
     startY: 70,
     head: [["Time", "Difference", "Change", "What moved since the snapshot before"]],
-    body: rows.map(({ snapshot, diffMoved, changes }) => [
+    body: (oldestFirst ? [...rows].reverse() : rows).map(({ snapshot, diffMoved, changes }) => [
       stamp(snapshot.at),
       snapshot.diff !== null ? rupees(snapshot.diff) : "-",
       diffMoved ? signedRupees(diffMoved) : "none",

@@ -1,17 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DatePicker } from "@/components/dashboard/DatePicker";
+import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import type { BalanceSnapshot } from "@/lib/admin/apiBalance";
 import { downloadHistoryPdf, historyRows, toHistoryCsv } from "@/lib/admin/balanceHistoryExport";
 import { DEFAULT_DASHBOARD_PATH, getDashboardSection } from "@/lib/data/dashboardNav";
 import { REPORTS_START_DATE, toIsoDate } from "@/lib/reports/dates";
 import { cn } from "@/lib/cn";
 
-const TOP_N = 50;
+/** How many snapshots to ask the vendor for ("All" = the most the route allows). */
+const LIMITS = [
+  { id: "50", label: "Latest 50", topN: 50 },
+  { id: "200", label: "Latest 200", topN: 200 },
+  { id: "1000", label: "Latest 1,000", topN: 1000 },
+  { id: "all", label: "All", topN: 20000 },
+] as const;
+const ORDERS = [
+  { id: "newest", label: "Newest first" },
+  { id: "oldest", label: "Oldest first" },
+];
+/** Rows drawn at a time; "Show more" adds the next batch (thousands of rows at once would freeze the page). */
+const PAGE_ROWS = 100;
 
 type Range = { from: string; to: string };
+type Request = Range & { limit: string };
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
@@ -32,9 +46,10 @@ function when(at: string): { day: string; time: string } {
   };
 }
 
-async function loadHistory(range: Range): Promise<LoadState> {
+async function loadHistory(request: Request): Promise<LoadState> {
   try {
-    const query = new URLSearchParams({ fromDate: range.from, toDate: range.to, topN: String(TOP_N) });
+    const topN = LIMITS.find((l) => l.id === request.limit)?.topN ?? 50;
+    const query = new URLSearchParams({ fromDate: request.from, toDate: request.to, topN: String(topN) });
     const response = await fetch(`/api/dashboard/admin/api-balance/history?${query}`, { cache: "no-store" });
     const data = await response.json().catch(() => null);
     if (!response.ok || !Array.isArray(data?.snapshots)) {
@@ -89,10 +104,12 @@ export function DifferenceHistoryView() {
   const section = getDashboardSection("view-history");
   const today = toIsoDate(new Date());
   const [draft, setDraft] = useState<Range>(defaultRange);
-  const [range, setRange] = useState<Range>(draft);
-  // The result is kept with the range it belongs to; a different range means it is still loading.
-  const [loaded, setLoaded] = useState<{ range: Range; state: LoadState } | null>(null);
-  const state: LoadState = loaded && loaded.range === range ? loaded.state : { status: "loading" };
+  const [range, setRange] = useState<Request>({ ...draft, limit: "50" });
+  const [order, setOrder] = useState("newest");
+  const [shown, setShown] = useState(PAGE_ROWS);
+  // The result is kept with the request it belongs to; a different request means it is still loading.
+  const [loaded, setLoaded] = useState<{ range: Request; state: LoadState } | null>(null);
+  const state = useMemo<LoadState>(() => (loaded && loaded.range === range ? loaded.state : { status: "loading" }), [loaded, range]);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,13 +121,20 @@ export function DifferenceHistoryView() {
     };
   }, [range]);
 
-  const snapshots = state.status === "ready" ? state.snapshots : [];
+  const snapshots = useMemo(() => (state.status === "ready" ? state.snapshots : []), [state]);
+  const oldestFirst = order === "oldest";
+  // What moved is always measured against the snapshot before it in time; "Oldest first" only flips the list.
+  const rows = useMemo(() => {
+    const all = historyRows(snapshots);
+    return oldestFirst ? all.reverse() : all;
+  }, [snapshots, oldestFirst]);
+  const limit = LIMITS.find((l) => l.id === range.limit) ?? LIMITS[0];
   const [exporting, setExporting] = useState(false);
   const fileBase = `difference-history_${range.from}_to_${range.to}`;
 
   function exportExcel() {
     // The byte order mark makes Excel read the file as UTF-8; the numbers are plain, so Excel can sum them.
-    const blob = new Blob(["﻿", toHistoryCsv(snapshots)], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob(["﻿", toHistoryCsv(snapshots, oldestFirst)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -122,7 +146,7 @@ export function DifferenceHistoryView() {
   async function exportPdf() {
     setExporting(true);
     try {
-      await downloadHistoryPdf(snapshots, range, `${fileBase}.pdf`);
+      await downloadHistoryPdf(snapshots, range, `${fileBase}.pdf`, oldestFirst);
     } finally {
       setExporting(false);
     }
@@ -145,14 +169,16 @@ export function DifferenceHistoryView() {
       </nav>
       <h1 className="mt-2 text-base font-bold tracking-tight text-text-primary">Difference history</h1>
       <p className="mt-0.5 text-xs text-text-secondary">
-        Saved balance snapshots, newest first (latest {TOP_N}). The chips show what moved since the snapshot before.
+        Saved balance snapshots, {oldestFirst ? "oldest" : "newest"} first ({limit.id === "all" ? "all in the range" : `latest ${limit.topN}`}). The chips show
+        what moved since the snapshot before it in time.
       </p>
 
       <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm">
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          setRange(draft);
+          setRange((r) => ({ ...draft, limit: r.limit }));
+          setShown(PAGE_ROWS);
         }}
         className="flex shrink-0 flex-wrap items-center gap-2 border-b border-brand-border px-4 py-3"
       >
@@ -175,10 +201,22 @@ export function DifferenceHistoryView() {
         >
           Apply
         </button>
+        <FilterSelect
+          id="history-limit"
+          label="How many snapshots"
+          value={range.limit}
+          options={LIMITS}
+          onChange={(next) => {
+            setRange((r) => ({ ...r, limit: next }));
+            setShown(PAGE_ROWS);
+          }}
+          className="w-36"
+        />
+        <FilterSelect id="history-order" label="Order" value={order} options={ORDERS} onChange={setOrder} className="w-36" />
         {state.status === "ready" && (
           <div className="ml-auto flex items-center gap-2">
             <p className="text-xs tabular-nums text-text-secondary">
-              {snapshots.length} snapshot{snapshots.length === 1 ? "" : "s"}
+              {snapshots.length.toLocaleString("en-IN")} snapshot{snapshots.length === 1 ? "" : "s"}
             </p>
             <button type="button" onClick={exportExcel} disabled={snapshots.length === 0} title="Download as an Excel-ready CSV file" className={exportButton}>
               <DownloadIcon />
@@ -213,8 +251,8 @@ export function DifferenceHistoryView() {
 
         {state.status === "ready" && snapshots.length > 0 && (
           <ul className="divide-y divide-brand-border/70" aria-label="Difference history">
-            {historyRows(snapshots).map(({ snapshot, diffMoved, changes }, i, all) => {
-              const older = all[i + 1]?.snapshot;
+            {rows.slice(0, shown).map(({ snapshot, diffMoved, changes }) => {
+              const hasOlder = diffMoved !== null;
               const { day, time } = when(snapshot.at);
               return (
                 <li key={snapshot.id || snapshot.at} className="grid gap-x-4 gap-y-1.5 px-5 py-3 sm:grid-cols-[8.5rem_11rem_minmax(0,1fr)]">
@@ -229,20 +267,32 @@ export function DifferenceHistoryView() {
                         {diffMoved > 0 ? "▲" : "▼"} {signed(diffMoved).slice(1)} since before
                       </p>
                     ) : (
-                      <p className="text-[11px] text-text-secondary">{older ? "No change in the difference" : "Oldest shown"}</p>
+                      <p className="text-[11px] text-text-secondary">{hasOlder ? "No change in the difference" : "Oldest shown"}</p>
                     )}
                   </div>
                   <div className="flex min-w-0 flex-wrap content-start items-start gap-1">
                     {changes.length > 0 ? (
                       changes.map((c) => <DeltaChip key={c.key} label={c.label} delta={c.delta} />)
                     ) : (
-                      <span className="text-[11px] text-text-secondary">{older ? "No balance moved" : "Nothing older to compare with"}</span>
+                      <span className="text-[11px] text-text-secondary">{hasOlder ? "No balance moved" : "Nothing older to compare with"}</span>
                     )}
                   </div>
                 </li>
               );
             })}
           </ul>
+        )}
+
+        {state.status === "ready" && rows.length > shown && (
+          <div className="flex justify-center border-t border-brand-border/70 p-3">
+            <button
+              type="button"
+              onClick={() => setShown((n) => n + PAGE_ROWS)}
+              className="h-9 rounded-lg border border-brand-border bg-white px-4 text-sm font-medium text-text-primary hover:border-brand-primary hover:text-brand-primary"
+            >
+              Show more ({(rows.length - shown).toLocaleString("en-IN")} left)
+            </button>
+          </div>
         )}
       </div>
       </div>

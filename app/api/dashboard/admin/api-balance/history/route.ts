@@ -7,7 +7,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const RATE_LIMIT = { limit: 30, windowMs: 10 * 60 * 1000 };
 const DEFAULT_TOP_N = 50;
-const MAX_TOP_N = 200;
+const MAX_TOP_N = 20000; // "All" on the page: about 8,500 snapshots a month
 
 /**
  * GET /api/dashboard/admin/api-balance/history?fromDate=&toDate=&topN= → vendor getApiLevelBalance (saved
