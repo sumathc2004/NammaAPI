@@ -58,6 +58,12 @@ export const dashboardSections = [
     role: "adminOrAccountant",
   },
   {
+    id: "view-history",
+    label: "View History",
+    description: "Saved snapshots of the platform balances and what changed in the difference.",
+    role: "adminOrAccountant",
+  },
+  {
     id: "super-access",
     label: "Super Access",
     description: "BUL account balances and the PG tally.",

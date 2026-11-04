@@ -1,6 +1,6 @@
 import "server-only";
 import { aepsRequest, AEPS_UNEXPECTED_ERROR } from "@/lib/server/aepsClient";
-import { accountLabel, type ApiLevelBalance } from "@/lib/admin/apiBalance";
+import { accountLabel, type ApiLevelBalance, type BalanceSnapshot } from "@/lib/admin/apiBalance";
 import type { BpayStatusCheck, PgTallyRow } from "@/lib/admin/pgTally";
 import type { DaySummary } from "@/lib/admin/daySummary";
 import type { BulkpeEntry, BulkpeStatementPage } from "@/lib/admin/bulkpeStatement";
@@ -358,4 +358,38 @@ export async function fetchBulkpeStatement(page: number): Promise<BulkpeStatemen
   // An older page can exist only if this one was full and nothing in it was cut off by the start date.
   const hasMore = all.length > 0 && all.length >= pageSize && entries.length === all.length;
   return { ok: true, statement: { page, entries, hasMore } };
+}
+
+export type BalanceHistoryResult = { ok: true; snapshots: BalanceSnapshot[] } | { ok: false; error: string };
+
+/**
+ * Admin-only: `GET getApiLevelBalance?fromDate=&toDate=&topN=` — saved snapshots of the platform balances,
+ * newest first: { status: "true", data: [{ Id, CreatedAt, Wallet, AepsTotal, AepsIn, AepsOut, Bul_0080 …,
+ * Rupe, Unsettled, Pending, InvWithdraw, RefreshToRefund, Diff }] }. It needs no credentials, so none are sent;
+ * the route in front of it decides who may ask.
+ */
+export async function fetchApiBalanceHistory(from: string, to: string, topN: number): Promise<BalanceHistoryResult> {
+  const result = await aepsRequest("getApiLevelBalance", { fromDate: from, toDate: to, topN: String(topN) }, { prefer: "json" });
+  if (!result.ok) return result;
+
+  const body = (result.body ?? {}) as { status?: unknown; data?: unknown };
+  if (!Array.isArray(body.data)) {
+    console.error("AEPS getApiLevelBalance did not return a list.");
+    return { ok: false, error: AEPS_UNEXPECTED_ERROR };
+  }
+
+  const snapshots = (body.data as Record<string, unknown>[]).flatMap((row) => {
+    const wallet = toNumber(row.Wallet);
+    const at = text(row.CreatedAt);
+    if (wallet === null || !at) return [];
+    const accounts = Object.entries(row)
+      .filter(([key]) => !/^(id|createdat|wallet|diff)$/i.test(key))
+      .flatMap(([key, value]) => {
+        const amount = toNumber(value);
+        const lower = key.toLowerCase();
+        return amount === null ? [] : [{ key: lower, label: accountLabel(lower), amount }];
+      });
+    return [{ id: toNumber(row.Id) ?? 0, at, wallet, diff: toNumber(row.Diff), accounts }];
+  });
+  return { ok: true, snapshots };
 }

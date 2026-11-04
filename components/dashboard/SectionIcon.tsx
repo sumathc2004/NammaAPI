@@ -69,6 +69,12 @@ const paths = {
       <path d="M14 3v5h5M9 13h6M9 17h6" />
     </>
   ),
+  "view-history": (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
   "super-access": (
     <>
       <circle cx="8.5" cy="14.5" r="3.5" />
