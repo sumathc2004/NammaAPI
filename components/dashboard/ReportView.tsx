@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { getDashboardSection, type DashboardSectionId } from "@/lib/data/dashboardNav";
-import { clearDemoSession } from "@/lib/auth/demoSession";
+import { clearDemoSession, parseDemoSession, readDemoSessionRaw, subscribeDemoSession } from "@/lib/auth/demoSession";
 import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
@@ -638,6 +638,9 @@ export function ReportView({
   const router = useRouter();
   const { label } = getDashboardSection(section);
   const today = toIsoDate(new Date());
+  // Admins have no report start date. This only frees the picker; the server decides from the session.
+  const rawProfile = useSyncExternalStore(subscribeDemoSession, readDemoSessionRaw, () => undefined);
+  const isAdmin = parseDemoSession(rawProfile)?.isAdmin === true;
 
   const [range, setRange] = useState<Range>(() => ({ from: today, to: today }));
   const [draft, setDraft] = useState<Range>(range);
@@ -660,7 +663,7 @@ export function ReportView({
   }, [section, range]);
 
   function apply(next: Range) {
-    const error = validateRange(next.from, next.to, section);
+    const error = validateRange(next.from, next.to, section, { noStartDate: isAdmin });
     setRangeError(error);
     if (error) return;
     setDraft(next);
@@ -942,11 +945,11 @@ export function ReportView({
         {!compact && (
           <div className="flex flex-wrap items-center gap-2">
             <form onSubmit={handleSubmit} className={cn("flex w-full items-center gap-1.5", !compact && "md:w-auto")}>
-              {/* Nothing before the section's start date can be picked; the server enforces the same limit. */}
+              {/* Nothing before the section's start date can be picked (admins: no limit); the server enforces the same. */}
               <DatePicker
                 label="From"
                 value={draft.from}
-                min={reportStartDate(section)}
+                min={isAdmin ? undefined : reportStartDate(section)}
                 max={draft.to}
                 onChange={(from) => setDraft((d) => ({ ...d, from }))}
                 className="min-w-0 flex-1 md:w-52 md:flex-none"

@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const from = params.get("fromDate") ?? "";
   const to = params.get("toDate") ?? "";
-  const rangeError = validateRange(from, to);
+  const rangeError = validateRange(from, to, undefined, { noStartDate: credentials.isAdmin });
   if (rangeError) return NextResponse.json({ error: rangeError }, { status: 400 });
 
   const requested = Number(params.get("topN") ?? DEFAULT_TOP_N);

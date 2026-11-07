@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Choose a valid page." }, { status: 400 });
   }
 
-  const result = await fetchBulkpeStatement(page);
+  const result = await fetchBulkpeStatement(page, { noStartDate: credentials.isAdmin });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
 
   return NextResponse.json({ ok: true, ...result.statement, fetchedAt: new Date().toISOString() });

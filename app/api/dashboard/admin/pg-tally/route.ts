@@ -37,7 +37,7 @@ export async function GET(request: Request) {
   const fromDate = params.get("fromDate") || today;
   const toDate = params.get("toDate") || today;
   // Same date rules as PG Reports (it's the same card collections).
-  const rangeError = validateRange(fromDate, toDate, "pg-reports");
+  const rangeError = validateRange(fromDate, toDate, "pg-reports", { noStartDate: credentials.isAdmin });
   if (rangeError) return NextResponse.json({ error: rangeError }, { status: 400 });
 
   const result = await fetchPgTally(fromDate, toDate, owner);

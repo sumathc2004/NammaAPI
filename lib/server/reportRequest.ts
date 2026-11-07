@@ -21,18 +21,19 @@ export async function handleReportRequest(request: Request, section: DashboardSe
     );
   }
 
+  const credentials = await getSessionCredentials();
+  if (!credentials) {
+    return NextResponse.json({ error: "Your session has expired. Please log in again." }, { status: 401 });
+  }
+
   const params = new URL(request.url).searchParams;
   const today = todayInIndia();
   const fromDate = params.get("fromDate") || today;
   const toDate = params.get("toDate") || today;
 
-  const rangeError = validateRange(fromDate, toDate, section);
+  // The session decides whether the start date applies, so the session check comes first.
+  const rangeError = validateRange(fromDate, toDate, section, { noStartDate: credentials.isAdmin });
   if (rangeError) return NextResponse.json({ error: rangeError }, { status: 400 });
-
-  const credentials = await getSessionCredentials();
-  if (!credentials) {
-    return NextResponse.json({ error: "Your session has expired. Please log in again." }, { status: 401 });
-  }
 
   const result = await fetchReport(section, credentials, fromDate, toDate);
   if (!result.ok) {

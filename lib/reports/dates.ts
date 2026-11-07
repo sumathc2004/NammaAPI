@@ -9,6 +9,7 @@ export const MAX_RANGE_DAYS = 366;
  * Nothing dated before this day is ever shown. Enforced on the server (validateRange rejects an
  * earlier From date, and fetchReport drops older rows the vendor still returns); the date pickers
  * only mirror it. Changing it needs a code change and a deploy — no request can override it.
+ * Admins (`isAdmin` in the encrypted session cookie, checked on the server) have no start date.
  */
 export const REPORTS_START_DATE = "2026-10-07";
 
@@ -47,11 +48,19 @@ export function formatIsoDate(value: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-/** Returns an error message, or null when `from`–`to` is a valid range. */
-export function validateRange(from: string, to: string, section?: DashboardSectionId): string | null {
+/**
+ * Returns an error message, or null when `from`–`to` is a valid range. `noStartDate` lifts the start
+ * date for admins; on the server it must come from the session, never from the request.
+ */
+export function validateRange(
+  from: string,
+  to: string,
+  section?: DashboardSectionId,
+  { noStartDate = false }: { noStartDate?: boolean } = {},
+): string | null {
   if (!isIsoDate(from) || !isIsoDate(to)) return "Choose a valid From and To date.";
   const start = reportStartDate(section);
-  if (from < start) return `Reports are available from ${formatIsoDate(start)}.`;
+  if (!noStartDate && from < start) return `Reports are available from ${formatIsoDate(start)}.`;
   if (from > to) return "From date must be on or before To date.";
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
   if (days > MAX_RANGE_DAYS) return `Choose a range of ${MAX_RANGE_DAYS} days or less.`;
