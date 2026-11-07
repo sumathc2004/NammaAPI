@@ -311,8 +311,12 @@ function indiaDay(iso: string): string | null {
  * the role check on our route is the only gate. Only the fields below reach the browser: the
  * virtual-account fields and the full account number are dropped here. `token` is the code of the
  * BUL account the entry went through ("8539" → the "BUL 8539" card in the API level balance).
+ * `noStartDate` lifts the report start date for admins; the route takes it from the session.
  */
-export async function fetchBulkpeStatement(page: number): Promise<BulkpeStatementResult> {
+export async function fetchBulkpeStatement(
+  page: number,
+  { noStartDate = false }: { noStartDate?: boolean } = {},
+): Promise<BulkpeStatementResult> {
   const result = await aepsRequest("APIClient/GetBulkpeStatement", { pageNo: String(page) }, { api: "client", prefer: "json" });
   if (!result.ok) return result;
 
@@ -350,10 +354,12 @@ export async function fetchBulkpeStatement(page: number): Promise<BulkpeStatemen
   });
 
   // Same rule as every report: nothing before the start date (or without a readable date) is shown.
-  const entries = all.filter((entry) => {
-    const day = indiaDay(entry.createdAt);
-    return day !== null && day >= REPORTS_START_DATE;
-  });
+  const entries = noStartDate
+    ? all
+    : all.filter((entry) => {
+        const day = indiaDay(entry.createdAt);
+        return day !== null && day >= REPORTS_START_DATE;
+      });
   const pageSize = toNumber(body.count) ?? 150;
   // An older page can exist only if this one was full and nothing in it was cut off by the start date.
   const hasMore = all.length > 0 && all.length >= pageSize && entries.length === all.length;

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import type { BalanceSnapshot } from "@/lib/admin/apiBalance";
+import { parseDemoSession, readDemoSessionRaw, subscribeDemoSession } from "@/lib/auth/demoSession";
 import { downloadHistoryPdf, historyRows, toHistoryCsv } from "@/lib/admin/balanceHistoryExport";
 import { DEFAULT_DASHBOARD_PATH, getDashboardSection } from "@/lib/data/dashboardNav";
 import { REPORTS_START_DATE, toIsoDate } from "@/lib/reports/dates";
@@ -103,6 +104,9 @@ function DeltaChip({ label, delta }: { label: string; delta: number }) {
 export function DifferenceHistoryView() {
   const section = getDashboardSection("view-history");
   const today = toIsoDate(new Date());
+  // Admins have no report start date. This only frees the picker; the server decides from the session.
+  const rawProfile = useSyncExternalStore(subscribeDemoSession, readDemoSessionRaw, () => undefined);
+  const isAdmin = parseDemoSession(rawProfile)?.isAdmin === true;
   const [draft, setDraft] = useState<Range>(defaultRange);
   const [range, setRange] = useState<Request>({ ...draft, limit: "50" });
   const [order, setOrder] = useState("newest");
@@ -185,7 +189,7 @@ export function DifferenceHistoryView() {
         <DatePicker
           label="From"
           value={draft.from}
-          min={REPORTS_START_DATE}
+          min={isAdmin ? undefined : REPORTS_START_DATE}
           max={draft.to}
           onChange={(from) => setDraft((d) => ({ ...d, from }))}
           className="w-52"

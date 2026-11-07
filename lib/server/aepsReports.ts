@@ -244,12 +244,15 @@ export async function fetchReport(
   const raw = toTable(records);
   const transformed = config.transform ? raw.rows.map(config.transform) : raw.rows;
   // Never pass on anything dated before the section's start date, whatever range the vendor returned.
+  // Admins have no start date (the flag is from the encrypted session cookie), so they get every row.
   const startDate = reportStartDate(section);
   // Rows without a readable date are dropped too: when in doubt, don't show it.
-  const rows = transformed.filter((row) => {
-    const date = rowDate(row);
-    return date !== null && date >= startDate;
-  });
+  const rows = credentials.isAdmin
+    ? transformed
+    : transformed.filter((row) => {
+        const date = rowDate(row);
+        return date !== null && date >= startDate;
+      });
   if (process.env.NODE_ENV === "development" && rows.length < transformed.length) {
     console.info(`AEPS ${endpoint}: hid ${transformed.length - rows.length} rows dated before ${startDate} or undated.`);
   }
