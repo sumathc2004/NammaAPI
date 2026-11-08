@@ -1,5 +1,6 @@
 import { AdminPanels } from "@/components/dashboard/AdminPanels";
 import { ApiBalanceView } from "@/components/dashboard/ApiBalanceView";
+import { CcTxnsDrawer } from "@/components/dashboard/CcTxnsDrawer";
 import { DaySummaryView } from "@/components/dashboard/DaySummaryView";
 
 /**
@@ -8,13 +9,15 @@ import { DaySummaryView } from "@/components/dashboard/DaySummaryView";
  * `AdminPanels` lays itself out by the width it actually gets (sidebar open or collapsed), not the
  * screen's. The page scrolls (one scrollbar, the page's); from `@5xl` each of the three panels is as
  * tall as the screen, so once the balance cards are scrolled past, the panels fill the window and
- * show as many rows as possible, each scrolling inside with its own slim scrollbar.
+ * show as many rows as possible, each scrolling inside with its own slim scrollbar. Admins also get the
+ * "Bulkpe CC Txns" tab on the right edge of the screen (it hides itself for accountants).
  */
 export function AdminOverview() {
   return (
     <div className="@container flex flex-1 flex-col gap-3">
       <ApiBalanceView extra={<DaySummaryView inline />} />
       <AdminPanels />
+      <CcTxnsDrawer />
     </div>
   );
 }

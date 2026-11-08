@@ -19,6 +19,18 @@ export function getClientApiBaseUrl(): string {
 }
 
 /**
+ * The vendor's cards API, used until CARDS_API_BASE_URL is set on the host. This file is server-only, so the
+ * address never reaches the browser.
+ */
+const DEFAULT_CARDS_API_BASE_URL = "http://172.198.160.73/clients/api";
+
+/** Base URL for the vendor's cards API (credit-card bill payments): CARDS_API_BASE_URL, else the built-in default. No trailing slash. */
+export function getCardsApiBaseUrl(): string {
+  const url = process.env.CARDS_API_BASE_URL || DEFAULT_CARDS_API_BASE_URL;
+  return url.replace(/\/+$/, "");
+}
+
+/**
  * Key material for encrypting the session cookie (lib/server/session.ts). Required in every
  * environment; anyone who knows it can decrypt stored credentials, so never commit it.
  * Generate one with: openssl rand -hex 32
