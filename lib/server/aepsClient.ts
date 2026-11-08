@@ -1,6 +1,6 @@
 import "server-only";
 import { XMLParser } from "fast-xml-parser";
-import { getAepsApiBaseUrl, getClientApiBaseUrl } from "@/lib/server/env";
+import { getAepsApiBaseUrl, getCardsApiBaseUrl, getClientApiBaseUrl } from "@/lib/server/env";
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
@@ -12,10 +12,11 @@ export type AepsResult = { ok: true; body: unknown } | { ok: false; error: strin
 
 type AepsRequestOptions = {
   /**
-   * Which vendor API: "aeps" (AEPS_API_BASE_URL, ".../v5bc/api/aeps") or "client"
-   * (CLIENT_API_BASE_URL, ".../apiclient/api", e.g. "transfer/report"). Default: "aeps".
+   * Which vendor API: "aeps" (AEPS_API_BASE_URL, ".../v5bc/api/aeps"), "client"
+   * (CLIENT_API_BASE_URL, ".../apiclient/api", e.g. "transfer/report") or "cards"
+   * (CARDS_API_BASE_URL, ".../clients/api", e.g. "CreditCard/Statement"). Default: "aeps".
    */
-  api?: "aeps" | "client";
+  api?: "aeps" | "client" | "cards";
   /** The vendor's "_api" endpoints are POST, with parameters still in the query string. */
   method?: "GET" | "POST";
   /** Response format to ask for; the vendor serves both XML and JSON. */
@@ -52,7 +53,7 @@ export async function aepsRequest(
   params: Record<string, string>,
   { api = "aeps", method = "GET", prefer = "xml", controller, timeoutMs = REQUEST_TIMEOUT_MS }: AepsRequestOptions = {},
 ): Promise<AepsResult> {
-  const base = api === "client" ? getClientApiBaseUrl() : getAepsApiBaseUrl();
+  const base = api === "client" ? getClientApiBaseUrl() : api === "cards" ? getCardsApiBaseUrl() : getAepsApiBaseUrl();
   // Swap the last path segment (".../api/aeps") for another controller when asked.
   const controllerBase = controller ? `${base.replace(/\/[^/]+$/, "")}/${controller}` : base;
   const url = new URL(`${controllerBase}/${endpoint}`);
