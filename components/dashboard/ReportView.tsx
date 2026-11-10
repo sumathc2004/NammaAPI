@@ -351,7 +351,7 @@ function RowCard({
                 {badges.map((column) => (
                   <Cell key={column.key} column={column} row={row} />
                 ))}
-                {section === "transfer" && row.UniqueTxnId && (
+                {section === "transfer" && row.UniqueTxnId && isRefreshableTransfer(row) && (
                   <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => onCheck(row.UniqueTxnId)} />
                 )}
               </span>
@@ -914,6 +914,8 @@ export function ReportView({
   const currentPage = Math.min(page, pageCount - 1);
   const pageRows = filteredRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
   const cardLayout = useMemo(() => planCard(columns, table), [columns, table]);
+  // The Check column (Transfer) is only for transfers in the Refresh tab, so it shows only while there are some.
+  const showCheckColumn = section === "transfer" && filteredRows.some(isRefreshableTransfer);
 
   // Totals: one amount column split by its Cr/Dr field, or separate credit/debit columns.
   // When there's a Status column, only successful entries count (failed/pending moved no money).
@@ -1309,7 +1311,7 @@ export function ReportView({
                           </span>
                         )}
                         {listStatus && <StatusText className="px-1.5 @md:px-2 [&>span:first-child]:hidden @md:[&>span:first-child]:block">{cellValue(listStatus, row)}</StatusText>}
-                        {section === "transfer" && row.UniqueTxnId && (
+                        {section === "transfer" && row.UniqueTxnId && isRefreshableTransfer(row) && (
                           <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => checkStatus(row.UniqueTxnId)} className="size-5" />
                         )}
                         {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} compact />}
@@ -1344,7 +1346,7 @@ export function ReportView({
                       >
                         {timeOnly && column.kind === "date" ? "Time" : columnTitle(column)}
                       </th>
-                      {section === "transfer" && column.kind === "status" && (
+                      {showCheckColumn && column.kind === "status" && (
                         <th scope="col" className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                           Check
                         </th>
@@ -1409,9 +1411,9 @@ export function ReportView({
                           <Cell column={column} row={row} variant="table" />
                         )}
                       </td>
-                      {section === "transfer" && column.kind === "status" && (
+                      {showCheckColumn && column.kind === "status" && (
                         <td className="px-3 py-2.5 text-center align-middle">
-                          {row.UniqueTxnId && (
+                          {row.UniqueTxnId && isRefreshableTransfer(row) && (
                             <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => checkStatus(row.UniqueTxnId)} />
                           )}
                         </td>
