@@ -13,6 +13,9 @@ export const MAX_RANGE_DAYS = 366;
  */
 export const REPORTS_START_DATE = "2026-10-07";
 
+/** Super-access accounts see only transfers from this day on in the Transfer Reports "Refresh" list. */
+export const SUPER_ACCESS_REFRESH_FROM = "2026-11-02";
+
 /** Sections whose reports start earlier (or later) than REPORTS_START_DATE. */
 const SECTION_START_DATES: Partial<Record<DashboardSectionId, string>> = {
   "pg-reports": "2026-10-04",

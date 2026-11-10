@@ -92,10 +92,24 @@ export function isProperUtr(utr: string | undefined): boolean {
 
 /**
  * Transfer only: worth a manual re-check — the vendor's own canRefresh flag when it sends one,
- * otherwise Success with no (or no valid) UTR yet.
+ * otherwise Success with no (or no valid) UTR yet. A refunded transfer is finished, so never.
  */
 export const isRefreshableTransfer = (row: ReportRow) =>
-  rowFlag(row, ["canrefresh"]) || (row.TxnStatus === "Success" && !isProperUtr(row.UTR));
+  !isRefundedTransfer(row) && (rowFlag(row, ["canrefresh"]) || (row.TxnStatus === "Success" && !isProperUtr(row.UTR)));
+
+/** A row's calendar day as "yyyy-MM-dd": the first date/time field that parses (the vendor's own wall-clock day). */
+export function rowIsoDate(row: ReportRow): string | null {
+  for (const [key, value] of Object.entries(row)) {
+    if (!value || !/date|time/i.test(key)) continue;
+    const date = parseDate(value);
+    if (date) {
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${date.getFullYear()}-${m}-${d}`;
+    }
+  }
+  return null;
+}
 
 /**
  * Transfer only: best-effort local update after a successful Dequeue/Enqueue/Refund, so the row's

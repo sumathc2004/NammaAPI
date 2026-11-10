@@ -1,11 +1,11 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { getDashboardSection, type DashboardSectionId } from "@/lib/data/dashboardNav";
 import { clearDemoSession, parseDemoSession, readDemoSessionRaw, subscribeDemoSession } from "@/lib/auth/demoSession";
-import { reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
+import { SUPER_ACCESS_REFRESH_FROM, reportStartDate, toIsoDate, validateRange } from "@/lib/reports/dates";
 import { DatePicker } from "@/components/dashboard/DatePicker";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { RowTime } from "@/components/dashboard/RowTime";
@@ -24,6 +24,7 @@ import {
   isRefreshableTransfer,
   isRefundableTransfer,
   layoutColumns,
+  rowIsoDate,
   sumColumn,
   toCsv,
   transferRowId,
@@ -296,6 +297,7 @@ function RowCard({
   onAction,
   checkingId,
   onCheck,
+  checkable,
   timeOnly = false,
 }: {
   row: ReportRow;
@@ -305,6 +307,8 @@ function RowCard({
   onRefresh: (uniqueTxnId: string) => void;
   checkingId: string | null;
   onCheck: (uniqueTxnId: string) => void;
+  /** Show the Check icon (the row is in the Refresh list). */
+  checkable: boolean;
   pendingAction: { uniqueTxnId: string; action: TransferAction } | null;
   onAction: (action: TransferAction, uniqueTxnId: string, id: string) => void;
   /** Show just the time on the date line (single-day compact panel). */
@@ -351,7 +355,7 @@ function RowCard({
                 {badges.map((column) => (
                   <Cell key={column.key} column={column} row={row} />
                 ))}
-                {section === "transfer" && row.UniqueTxnId && isRefreshableTransfer(row) && (
+                {checkable && row.UniqueTxnId && (
                   <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => onCheck(row.UniqueTxnId)} />
                 )}
               </span>
@@ -692,6 +696,16 @@ export function ReportView({
   const views = reportViews[section];
   const [viewId, setViewId] = useState(views?.[0]?.id);
   const activeView = views?.find((v) => v.id === viewId);
+  // The Refresh list (and so the Check icon): never a refunded transfer, and for a super-access account (not an
+  // admin) only transfers from SUPER_ACCESS_REFRESH_FROM on.
+  const profile = parseDemoSession(rawProfile);
+  const limitRefreshFrom = profile?.isSuperAccess === true && !profile.isAdmin ? SUPER_ACCESS_REFRESH_FROM : null;
+  const canCheck = useCallback(
+    (row: ReportRow) =>
+      section === "transfer" && isRefreshableTransfer(row) && (!limitRefreshFrom || (rowIsoDate(row) ?? "") >= limitRefreshFrom),
+    [section, limitRefreshFrom],
+  );
+  const viewMatch = (view: NonNullable<typeof views>[number]) => (view.id === "needs-refresh" && section === "transfer" ? canCheck : view.match);
 
   useEffect(() => {
     let cancelled = false;
@@ -897,9 +911,9 @@ export function ReportView({
   // Rows of the selected tab (e.g. Transfer's All / Queue / Refundable), then the search on top.
   const viewRows = useMemo(() => {
     if (!table) return [];
-    const match = activeView?.match;
+    const match = activeView?.id === "needs-refresh" && section === "transfer" ? canCheck : activeView?.match;
     return match ? table.rows.filter(match) : table.rows;
-  }, [table, activeView]);
+  }, [table, activeView, section, canCheck]);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -915,7 +929,7 @@ export function ReportView({
   const pageRows = filteredRows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
   const cardLayout = useMemo(() => planCard(columns, table), [columns, table]);
   // The Check column (Transfer) is only for transfers in the Refresh tab, so it shows only while there are some.
-  const showCheckColumn = section === "transfer" && filteredRows.some(isRefreshableTransfer);
+  const showCheckColumn = filteredRows.some(canCheck);
 
   // Totals: one amount column split by its Cr/Dr field, or separate credit/debit columns.
   // When there's a Status column, only successful entries count (failed/pending moved no money).
@@ -1084,7 +1098,7 @@ export function ReportView({
               options={views.map((view) => ({
                 id: view.id,
                 label: view.label,
-                count: table ? (view.match ? table.rows.filter(view.match).length : table.rows.length) : null,
+                count: table ? (viewMatch(view) ? table.rows.filter(viewMatch(view)!).length : table.rows.length) : null,
               }))}
             />
           )}
@@ -1096,7 +1110,7 @@ export function ReportView({
             >
               {views.map((view) => {
                 const active = view.id === activeView?.id;
-                const count = table ? (view.match ? table.rows.filter(view.match).length : table.rows.length) : null;
+                const count = table ? (viewMatch(view) ? table.rows.filter(viewMatch(view)!).length : table.rows.length) : null;
                 return (
                   <button
                     key={view.id}
@@ -1240,6 +1254,7 @@ export function ReportView({
                 onAction={requestTransferAction}
                 checkingId={checkingId}
                 onCheck={checkStatus}
+                checkable={canCheck(row)}
                 timeOnly={timeOnly}
               />
             ))}
@@ -1311,7 +1326,7 @@ export function ReportView({
                           </span>
                         )}
                         {listStatus && <StatusText className="px-1.5 @md:px-2 [&>span:first-child]:hidden @md:[&>span:first-child]:block">{cellValue(listStatus, row)}</StatusText>}
-                        {section === "transfer" && row.UniqueTxnId && isRefreshableTransfer(row) && (
+                        {row.UniqueTxnId && canCheck(row) && (
                           <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => checkStatus(row.UniqueTxnId)} className="size-5" />
                         )}
                         {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} compact />}
@@ -1413,7 +1428,7 @@ export function ReportView({
                       </td>
                       {showCheckColumn && column.kind === "status" && (
                         <td className="px-3 py-2.5 text-center align-middle">
-                          {row.UniqueTxnId && isRefreshableTransfer(row) && (
+                          {row.UniqueTxnId && canCheck(row) && (
                             <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => checkStatus(row.UniqueTxnId)} />
                           )}
                         </td>
@@ -1755,10 +1770,6 @@ function TransferStatusDialog({
                 <span className="font-sans text-sm text-text-secondary">Not available yet</span>
               )}
             </dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt className="shrink-0 text-text-secondary">Channel</dt>
-            <dd className="text-text-primary">{check.channel || "—"}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="shrink-0 text-text-secondary">Time</dt>
