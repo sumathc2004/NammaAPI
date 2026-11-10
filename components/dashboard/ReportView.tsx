@@ -20,6 +20,7 @@ import {
   dateCellText,
   describeColumns,
   formatAmount,
+  formatDate,
   isQueuedTransfer,
   isRefreshableTransfer,
   isRefundableTransfer,
@@ -1452,6 +1453,8 @@ export function ReportView({
           onClose={() => setStatusPopup(null)}
           rowId={transferRowId(table?.rows.find((r) => r.UniqueTxnId === statusPopup.id) ?? {})}
           name={table?.rows.find((r) => r.UniqueTxnId === statusPopup.id)?.BeneficiaryName ?? ""}
+          rowAmount={table?.rows.find((r) => r.UniqueTxnId === statusPopup.id)?.Amount}
+          rowTime={Object.entries(table?.rows.find((r) => r.UniqueTxnId === statusPopup.id) ?? {}).find(([key, value]) => value && /date|time/i.test(key))?.[1]}
           onAction={(action, id) => {
             // Same flow as the row buttons: close this popup, then Refund asks for confirmation, Enqueue runs.
             setStatusPopup(null);
@@ -1673,12 +1676,17 @@ function TransferStatusDialog({
   onClose,
   rowId,
   name,
+  rowAmount,
+  rowTime,
   onAction,
 }: {
   popup: StatusPopup;
   onClose: () => void;
   /** The beneficiary's name from the report row (the vendor's status answer has none). */
   name: string;
+  /** The row's own amount and time, shown when the vendor's answer leaves them out (a transfer its partner has no record of yet). */
+  rowAmount: string | undefined;
+  rowTime: string | undefined;
   /** The vendor's internal id for the row — what Enqueue and Refund take (not the Txn ID). */
   rowId: string | undefined;
   onAction: (action: TransferAction, id: string) => void;
@@ -1748,7 +1756,9 @@ function TransferStatusDialog({
           )}
           <div className="flex items-center justify-between gap-4">
             <dt className="shrink-0 text-text-secondary">Amount</dt>
-            <dd className="text-base font-bold tabular-nums text-text-primary">{check.amount !== null ? formatAmount(String(check.amount)) : "—"}</dd>
+            <dd className="text-base font-bold tabular-nums text-text-primary">
+              {check.amount !== null ? formatAmount(String(check.amount)) : rowAmount ? formatAmount(rowAmount) : "—"}
+            </dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="shrink-0 text-text-secondary">Status</dt>
@@ -1773,7 +1783,7 @@ function TransferStatusDialog({
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="shrink-0 text-text-secondary">Time</dt>
-            <dd className="tabular-nums text-text-primary">{checkTime(check.txnTime)}</dd>
+            <dd className="tabular-nums text-text-primary">{check.txnTime ? checkTime(check.txnTime) : rowTime ? formatDate(rowTime) : "—"}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="shrink-0 text-text-secondary">Can be refunded</dt>
@@ -1783,6 +1793,14 @@ function TransferStatusDialog({
             <dt className="shrink-0 text-text-secondary">Can be queued again</dt>
             <dd>{yesNo(check.canEnqueue)}</dd>
           </div>
+          {check.waitHours !== null && check.hours !== null && !check.canRefund && (
+            <div className="flex items-center justify-between gap-4">
+              <dt className="shrink-0 text-text-secondary">Refund possible after</dt>
+              <dd className="text-right tabular-nums text-text-primary">
+                {check.waitHours} h <span className="text-text-secondary">(now {check.hours.toFixed(1)} h)</span>
+              </dd>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-4 border-t border-brand-border/70 pt-2.5">
             <dt className="shrink-0 text-text-secondary">Txn ID</dt>
             <dd className="flex min-w-0 items-center font-mono text-xs text-text-primary">

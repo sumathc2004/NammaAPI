@@ -37,8 +37,10 @@ const text = (value: unknown) => (typeof value === "string" ? value.trim() : typ
 
 /**
  * GET {AEPS_API_BASE_URL}/checkBulkpeStatus?uniqueId=<UniqueTxnId> — the vendor's live status of one transfer.
- * No credentials needed. Answers `{ status: "true", uniqueId, channel, amount, txnTime, displayStatus,
- * displayRemarks, utr, canRefund, isAddQueue }`, or `{ status: "false", message: "transaction not found" }`.
+ * No credentials needed. Answers `{ status: "true", uniqueId, displayStatus, displayRemarks, utr, canRefund,
+ * isAddQueue }` plus, depending on how far the transfer got, `channel`, `amount` and `txnTime` (a transfer the
+ * payout partner has no record of yet — `found: false` — comes without them, along with `hours` / `waitHours`),
+ * or `{ status: "false", message: "transaction not found" }`.
  */
 export async function checkTransferStatus(uniqueId: string): Promise<TransferStatusResult> {
   const result = await aepsRequest("checkBulkpeStatus", { uniqueId }, { prefer: "json" });
@@ -49,19 +51,21 @@ export async function checkTransferStatus(uniqueId: string): Promise<TransferSta
     console.error(`AEPS checkBulkpeStatus rejected id "${uniqueId}":`, JSON.stringify(body));
     return { ok: false, error: text(body?.message) || "The status could not be checked." };
   }
-  const amount = Number(body.amount);
+  const num = (value: unknown) => (value === null || value === undefined || value === "" || !Number.isFinite(Number(value)) ? null : Number(value));
   return {
     ok: true,
     check: {
       uniqueId: text(body.uniqueId) || uniqueId,
       channel: text(body.channel),
-      amount: Number.isFinite(amount) ? amount : null,
+      amount: num(body.amount),
       txnTime: text(body.txnTime),
       status: text(body.displayStatus),
       remarks: text(body.displayRemarks),
       utr: text(body.utr),
       canRefund: body.canRefund === true,
       canEnqueue: body.isAddQueue === true,
+      hours: num(body.hours),
+      waitHours: num(body.waitHours),
     },
   };
 }
