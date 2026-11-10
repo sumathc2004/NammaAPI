@@ -1436,6 +1436,7 @@ export function ReportView({
           popup={statusPopup}
           onClose={() => setStatusPopup(null)}
           rowId={transferRowId(table?.rows.find((r) => r.UniqueTxnId === statusPopup.id) ?? {})}
+          name={table?.rows.find((r) => r.UniqueTxnId === statusPopup.id)?.BeneficiaryName ?? ""}
           onAction={(action, id) => {
             // Same flow as the row buttons: close this popup, then Refund asks for confirmation, Enqueue runs.
             setStatusPopup(null);
@@ -1656,10 +1657,13 @@ function TransferStatusDialog({
   popup,
   onClose,
   rowId,
+  name,
   onAction,
 }: {
   popup: StatusPopup;
   onClose: () => void;
+  /** The beneficiary's name from the report row (the vendor's status answer has none). */
+  name: string;
   /** The vendor's internal id for the row — what Enqueue and Refund take (not the Txn ID). */
   rowId: string | undefined;
   onAction: (action: TransferAction, id: string) => void;
@@ -1715,12 +1719,22 @@ function TransferStatusDialog({
         <>
           <p className="mt-4 text-sm text-red-600">{popup.error}</p>
           <p className="mt-1.5 text-xs text-text-secondary">
-            Txn ID: <span className="font-mono">{popup.id}</span>
+            {name && <>{name} · </>}Txn ID: <span className="font-mono">{popup.id}</span>
           </p>
         </>
       )}
       {check && (
         <dl className="mt-4 space-y-2.5 text-sm">
+          {name && (
+            <div className="flex items-start justify-between gap-4">
+              <dt className="shrink-0 text-text-secondary">Beneficiary</dt>
+              <dd className="min-w-0 text-right font-semibold text-text-primary">{name}</dd>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Amount</dt>
+            <dd className="text-base font-bold tabular-nums text-text-primary">{check.amount !== null ? formatAmount(String(check.amount)) : "—"}</dd>
+          </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="shrink-0 text-text-secondary">Status</dt>
             <dd>{check.status ? <StatusText>{check.status}</StatusText> : "—"}</dd>
@@ -1741,10 +1755,6 @@ function TransferStatusDialog({
                 <span className="font-sans text-sm text-text-secondary">Not available yet</span>
               )}
             </dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt className="shrink-0 text-text-secondary">Amount</dt>
-            <dd className="font-semibold tabular-nums text-text-primary">{check.amount !== null ? formatAmount(String(check.amount)) : "—"}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="shrink-0 text-text-secondary">Channel</dt>
