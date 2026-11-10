@@ -64,8 +64,6 @@ export async function checkTransferStatus(uniqueId: string): Promise<TransferSta
       utr: text(body.utr),
       canRefund: body.canRefund === true,
       canEnqueue: body.isAddQueue === true,
-      hours: num(body.hours),
-      waitHours: num(body.waitHours),
     },
   };
 }

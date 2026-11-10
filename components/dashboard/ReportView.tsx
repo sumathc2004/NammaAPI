@@ -1793,14 +1793,6 @@ function TransferStatusDialog({
             <dt className="shrink-0 text-text-secondary">Can be queued again</dt>
             <dd>{yesNo(check.canEnqueue)}</dd>
           </div>
-          {check.waitHours !== null && check.hours !== null && !check.canRefund && (
-            <div className="flex items-center justify-between gap-4">
-              <dt className="shrink-0 text-text-secondary">Refund possible after</dt>
-              <dd className="text-right tabular-nums text-text-primary">
-                {check.waitHours} h <span className="text-text-secondary">(now {check.hours.toFixed(1)} h)</span>
-              </dd>
-            </div>
-          )}
           <div className="flex items-center justify-between gap-4 border-t border-brand-border/70 pt-2.5">
             <dt className="shrink-0 text-text-secondary">Txn ID</dt>
             <dd className="flex min-w-0 items-center font-mono text-xs text-text-primary">

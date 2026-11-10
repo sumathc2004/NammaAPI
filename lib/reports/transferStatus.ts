@@ -11,7 +11,4 @@ export type TransferStatusCheck = {
   canRefund: boolean;
   /** The vendor's `isAddQueue`: the transfer can be put back in the queue. */
   canEnqueue: boolean;
-  /** How old the transfer is, and how many hours the vendor waits before it can be refunded (when it says). */
-  hours: number | null;
-  waitHours: number | null;
 };
