@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { getDashboardSection, type DashboardSectionId } from "@/lib/data/dashboardNav";
@@ -33,6 +33,7 @@ import {
   type TransferAction,
 } from "@/lib/reports/table";
 import { columnLayouts, reportLayouts, reportViews, type ColumnLayoutId } from "@/lib/reports/layouts";
+import type { TransferStatusCheck } from "@/lib/reports/transferStatus";
 import { cn } from "@/lib/cn";
 
 const PAGE_SIZE = 50;
@@ -293,6 +294,8 @@ function RowCard({
   onRefresh,
   pendingAction,
   onAction,
+  checkingId,
+  onCheck,
   timeOnly = false,
 }: {
   row: ReportRow;
@@ -300,6 +303,8 @@ function RowCard({
   section: DashboardSectionId;
   refreshingTxnId: string | null;
   onRefresh: (uniqueTxnId: string) => void;
+  checkingId: string | null;
+  onCheck: (uniqueTxnId: string) => void;
   pendingAction: { uniqueTxnId: string; action: TransferAction } | null;
   onAction: (action: TransferAction, uniqueTxnId: string, id: string) => void;
   /** Show just the time on the date line (single-day compact panel). */
@@ -342,10 +347,13 @@ function RowCard({
               </span>
             )}
             {badges.length > 0 && (
-              <span className="flex gap-1">
+              <span className="flex items-center gap-1.5">
                 {badges.map((column) => (
                   <Cell key={column.key} column={column} row={row} />
                 ))}
+                {section === "transfer" && row.UniqueTxnId && (
+                  <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => onCheck(row.UniqueTxnId)} />
+                )}
               </span>
             )}
             {queueId && (
@@ -515,6 +523,39 @@ function RefreshUtrButton({ refreshing, onRefresh }: { refreshing: boolean; onRe
         <path d="M18 3v5h-5M6 21v-5h5" />
       </svg>
       Refresh
+    </button>
+  );
+}
+
+/** The Check column's icon button (Transfer): asks the vendor for the transfer's live status and shows it in a popup. */
+function CheckStatusButton({ checking, onCheck, className }: { checking: boolean; onCheck: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onCheck}
+      disabled={checking}
+      aria-label="Check the live status"
+      title="Check the live status"
+      className={cn(
+        "inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-brand-border bg-white text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-60",
+        className,
+      )}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={cn(checking && "animate-spin")}
+        aria-hidden="true"
+      >
+        <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+        <path d="M18 3v5h-5M6 21v-5h5" />
+      </svg>
     </button>
   );
 }
@@ -708,6 +749,33 @@ export function ReportView({
     }
   }
 
+  // Transfer only: the Check column's refresh icon asks the vendor (checkBulkpeStatus, through our API) for the
+  // transfer's live status and shows the answer in a popup. It doesn't touch the table.
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [statusPopup, setStatusPopup] = useState<StatusPopup | null>(null);
+  async function checkStatus(uniqueTxnId: string) {
+    if (checkingId) return;
+    setCheckingId(uniqueTxnId);
+    setStatusPopup({ status: "pending", id: uniqueTxnId });
+    try {
+      const response = await fetch("/api/dashboard/transfer/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uniqueId: uniqueTxnId }),
+      });
+      const data = await response.json().catch(() => null);
+      setStatusPopup(
+        response.ok && data?.ok && data.check
+          ? { status: "ok", id: uniqueTxnId, check: data.check as TransferStatusCheck }
+          : { status: "error", id: uniqueTxnId, error: data?.error || "The status could not be checked." },
+      );
+    } catch {
+      setStatusPopup({ status: "error", id: uniqueTxnId, error: "The status could not be checked. Check your connection and try again." });
+    } finally {
+      setCheckingId(null);
+    }
+  }
+
   // Transfer only: Dequeue/Enqueue/Refund — vendor row actions. No single-row data comes back
   // (just a status/message), so none of these touch the table — only confirm it worked. A row
   // can show more than one action at once, so the pending/result state tracks which one.
@@ -744,7 +812,7 @@ export function ReportView({
   const busyRef = useRef(false);
   const statusRef = useRef(state.status);
   useEffect(() => {
-    busyRef.current = pendingAction !== null || actionResult !== null;
+    busyRef.current = pendingAction !== null || actionResult !== null || statusPopup !== null;
     statusRef.current = state.status;
   });
   useEffect(() => {
@@ -1168,6 +1236,8 @@ export function ReportView({
                 onRefresh={refreshRow}
                 pendingAction={pendingAction}
                 onAction={requestTransferAction}
+                checkingId={checkingId}
+                onCheck={checkStatus}
                 timeOnly={timeOnly}
               />
             ))}
@@ -1239,6 +1309,9 @@ export function ReportView({
                           </span>
                         )}
                         {listStatus && <StatusText className="px-1.5 @md:px-2 [&>span:first-child]:hidden @md:[&>span:first-child]:block">{cellValue(listStatus, row)}</StatusText>}
+                        {section === "transfer" && row.UniqueTxnId && (
+                          <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => checkStatus(row.UniqueTxnId)} className="size-5" />
+                        )}
                         {section === "transfer" && <TransferRowActions row={row} pendingAction={pendingAction} onAction={requestTransferAction} compact />}
                       </span>
                     </span>
@@ -1259,18 +1332,24 @@ export function ReportView({
               <thead className="sticky top-0 z-10 bg-brand-light/95 backdrop-blur">
                 <tr>
                   {columns.map((column) => (
-                    <th
-                      key={column.key}
-                      scope="col"
-                      className={cn(
-                        "whitespace-nowrap px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary",
-                        compact && "px-2",
-                        column.kind === "amount" && "text-right",
-                        column.hideBelow && (compact ? HIDE_BELOW_PANEL : HIDE_BELOW)[column.hideBelow],
+                    <Fragment key={column.key}>
+                      <th
+                        scope="col"
+                        className={cn(
+                          "whitespace-nowrap px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary",
+                          compact && "px-2",
+                          column.kind === "amount" && "text-right",
+                          column.hideBelow && (compact ? HIDE_BELOW_PANEL : HIDE_BELOW)[column.hideBelow],
+                        )}
+                      >
+                        {timeOnly && column.kind === "date" ? "Time" : columnTitle(column)}
+                      </th>
+                      {section === "transfer" && column.kind === "status" && (
+                        <th scope="col" className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                          Check
+                        </th>
                       )}
-                    >
-                      {timeOnly && column.kind === "date" ? "Time" : columnTitle(column)}
-                    </th>
+                    </Fragment>
                   ))}
                 </tr>
               </thead>
@@ -1278,8 +1357,8 @@ export function ReportView({
                 {pageRows.map((row, i) => (
                   <tr key={currentPage * PAGE_SIZE + i} className="transition-colors hover:bg-brand-light/40">
                     {columns.map((column) => (
+                      <Fragment key={column.key}>
                       <td
-                        key={column.key}
                         className={cn(
                           "px-3 py-2.5 align-middle text-text-primary",
                           compact && "px-2",
@@ -1330,6 +1409,14 @@ export function ReportView({
                           <Cell column={column} row={row} variant="table" />
                         )}
                       </td>
+                      {section === "transfer" && column.kind === "status" && (
+                        <td className="px-3 py-2.5 text-center align-middle">
+                          {row.UniqueTxnId && (
+                            <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => checkStatus(row.UniqueTxnId)} />
+                          )}
+                        </td>
+                      )}
+                      </Fragment>
                     ))}
                   </tr>
                 ))}
@@ -1342,6 +1429,7 @@ export function ReportView({
 
       {refreshResult && <RefreshResultDialog result={refreshResult} onClose={() => setRefreshResult(null)} />}
       {actionResult && <TransferActionResultDialog result={actionResult} onClose={() => setActionResult(null)} />}
+      {statusPopup && <TransferStatusDialog popup={statusPopup} onClose={() => setStatusPopup(null)} />}
       {confirmRefund && (
         <ConfirmRefundDialog
           row={confirmRefund.row}
@@ -1529,6 +1617,142 @@ function TransferActionResultDialog({ result, onClose }: { result: TransferActio
           type="button"
           onClick={onClose}
           className="mt-5 w-full rounded-lg bg-brand-gradient py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+        >
+          Close
+        </button>
+      )}
+    </dialog>
+  );
+}
+
+type StatusPopup =
+  | { status: "pending"; id: string }
+  | { status: "ok"; id: string; check: TransferStatusCheck }
+  | { status: "error"; id: string; error: string };
+
+/** "2026-11-09T20:08:58.527" (the vendor's India wall-clock time) as "09 Nov 2026, 8:08 pm", read as written. */
+function checkTime(at: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(at);
+  if (!m) return at || "—";
+  const [, y, mo, d, h, mi, sec] = m.map(Number);
+  return new Date(y, mo - 1, d, h, mi, sec).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+/** The popup for the Check column: "Checking…", then the vendor's live status of the transfer (or its error). */
+function TransferStatusDialog({ popup, onClose }: { popup: StatusPopup; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  const check = popup.status === "ok" ? popup.check : null;
+  const yesNo = (value: boolean) => (
+    <span className={cn("font-semibold", value ? "text-emerald-700" : "text-text-secondary")}>{value ? "Yes" : "No"}</span>
+  );
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === dialogRef.current) onClose();
+      }}
+      aria-labelledby="transfer-status-title"
+      className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="transfer-status-title" className="flex items-center gap-2 text-base font-semibold text-text-primary">
+          {popup.status === "pending" && (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 animate-spin text-brand-primary" aria-hidden="true">
+              <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+              <path d="M18 3v5h-5M6 21v-5h5" />
+            </svg>
+          )}
+          {popup.status === "pending" ? "Checking the status…" : popup.status === "ok" ? "Transfer status" : "Couldn’t check the status"}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-brand-light hover:text-text-primary"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      {popup.status === "pending" && <p className="mt-4 text-sm text-text-secondary">Asking the payments service for the latest status…</p>}
+      {popup.status === "error" && (
+        <>
+          <p className="mt-4 text-sm text-red-600">{popup.error}</p>
+          <p className="mt-1.5 text-xs text-text-secondary">
+            Txn ID: <span className="font-mono">{popup.id}</span>
+          </p>
+        </>
+      )}
+      {check && (
+        <dl className="mt-4 space-y-2.5 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Status</dt>
+            <dd>{check.status ? <StatusText>{check.status}</StatusText> : "—"}</dd>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Remarks</dt>
+            <dd className="min-w-0 text-right text-text-primary">{check.remarks || "—"}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">UTR</dt>
+            <dd className="flex min-w-0 items-center font-mono text-xs text-text-primary">
+              {check.utr ? (
+                <>
+                  <span className="truncate">{check.utr}</span>
+                  <CopyButton value={check.utr} label="UTR" className="size-4" />
+                </>
+              ) : (
+                <span className="font-sans text-sm text-text-secondary">Not available yet</span>
+              )}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Amount</dt>
+            <dd className="font-semibold tabular-nums text-text-primary">{check.amount !== null ? formatAmount(String(check.amount)) : "—"}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Channel</dt>
+            <dd className="text-text-primary">{check.channel || "—"}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Time</dt>
+            <dd className="tabular-nums text-text-primary">{checkTime(check.txnTime)}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Can be refunded</dt>
+            <dd>{yesNo(check.canRefund)}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-text-secondary">Can be queued again</dt>
+            <dd>{yesNo(check.canEnqueue)}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4 border-t border-brand-border/70 pt-2.5">
+            <dt className="shrink-0 text-text-secondary">Txn ID</dt>
+            <dd className="flex min-w-0 items-center font-mono text-xs text-text-primary">
+              <span className="truncate">{check.uniqueId}</span>
+              <CopyButton value={check.uniqueId} label="Txn ID" className="size-4" />
+            </dd>
+          </div>
+        </dl>
+      )}
+
+      {popup.status !== "pending" && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
         >
           Close
         </button>

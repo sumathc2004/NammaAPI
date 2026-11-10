@@ -1,6 +1,7 @@
 import "server-only";
 import { aepsRequest } from "@/lib/server/aepsClient";
 import type { TransferAction } from "@/lib/reports/table";
+import type { TransferStatusCheck } from "@/lib/reports/transferStatus";
 
 export type TransferActionResult = { ok: true; message: string } | { ok: false; error: string };
 
@@ -28,4 +29,39 @@ export async function callTransferAction(action: TransferAction, id: string): Pr
     return { ok: false, error: body?.message || fallbackError };
   }
   return { ok: true, message: body.message || fallbackMessage };
+}
+
+export type TransferStatusResult = { ok: true; check: TransferStatusCheck } | { ok: false; error: string };
+
+const text = (value: unknown) => (typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "");
+
+/**
+ * GET {AEPS_API_BASE_URL}/checkBulkpeStatus?uniqueId=<UniqueTxnId> — the vendor's live status of one transfer.
+ * No credentials needed. Answers `{ status: "true", uniqueId, channel, amount, txnTime, displayStatus,
+ * displayRemarks, utr, canRefund, isAddQueue }`, or `{ status: "false", message: "transaction not found" }`.
+ */
+export async function checkTransferStatus(uniqueId: string): Promise<TransferStatusResult> {
+  const result = await aepsRequest("checkBulkpeStatus", { uniqueId }, { prefer: "json" });
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const body = result.body as Record<string, unknown> | null;
+  if (!body || String(body.status).toLowerCase() !== "true") {
+    console.error(`AEPS checkBulkpeStatus rejected id "${uniqueId}":`, JSON.stringify(body));
+    return { ok: false, error: text(body?.message) || "The status could not be checked." };
+  }
+  const amount = Number(body.amount);
+  return {
+    ok: true,
+    check: {
+      uniqueId: text(body.uniqueId) || uniqueId,
+      channel: text(body.channel),
+      amount: Number.isFinite(amount) ? amount : null,
+      txnTime: text(body.txnTime),
+      status: text(body.displayStatus),
+      remarks: text(body.displayRemarks),
+      utr: text(body.utr),
+      canRefund: body.canRefund === true,
+      canEnqueue: body.isAddQueue === true,
+    },
+  };
 }
