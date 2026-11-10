@@ -1431,7 +1431,18 @@ export function ReportView({
 
       {refreshResult && <RefreshResultDialog result={refreshResult} onClose={() => setRefreshResult(null)} />}
       {actionResult && <TransferActionResultDialog result={actionResult} onClose={() => setActionResult(null)} />}
-      {statusPopup && <TransferStatusDialog popup={statusPopup} onClose={() => setStatusPopup(null)} />}
+      {statusPopup && (
+        <TransferStatusDialog
+          popup={statusPopup}
+          onClose={() => setStatusPopup(null)}
+          rowId={transferRowId(table?.rows.find((r) => r.UniqueTxnId === statusPopup.id) ?? {})}
+          onAction={(action, id) => {
+            // Same flow as the row buttons: close this popup, then Refund asks for confirmation, Enqueue runs.
+            setStatusPopup(null);
+            requestTransferAction(action, statusPopup.id, id);
+          }}
+        />
+      )}
       {confirmRefund && (
         <ConfirmRefundDialog
           row={confirmRefund.row}
@@ -1641,7 +1652,18 @@ function checkTime(at: string): string {
 }
 
 /** The popup for the Check column: "Checking…", then the vendor's live status of the transfer (or its error). */
-function TransferStatusDialog({ popup, onClose }: { popup: StatusPopup; onClose: () => void }) {
+function TransferStatusDialog({
+  popup,
+  onClose,
+  rowId,
+  onAction,
+}: {
+  popup: StatusPopup;
+  onClose: () => void;
+  /** The vendor's internal id for the row — what Enqueue and Refund take (not the Txn ID). */
+  rowId: string | undefined;
+  onAction: (action: TransferAction, id: string) => void;
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -1750,11 +1772,39 @@ function TransferStatusDialog({ popup, onClose }: { popup: StatusPopup; onClose:
         </dl>
       )}
 
+      {check && rowId && (check.canRefund || check.canEnqueue) && (
+        <div className="mt-5 flex gap-2">
+          {check.canEnqueue && (
+            <button
+              type="button"
+              onClick={() => onAction("enqueue", rowId)}
+              className="flex-1 rounded-lg border border-brand-primary bg-white py-2.5 text-sm font-semibold text-brand-primary transition-colors hover:bg-brand-light"
+            >
+              Enqueue
+            </button>
+          )}
+          {check.canRefund && (
+            <button
+              type="button"
+              onClick={() => onAction("refund", rowId)}
+              className="flex-1 rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+            >
+              Refund
+            </button>
+          )}
+        </div>
+      )}
+
       {popup.status !== "pending" && (
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+          className={cn(
+            "w-full rounded-lg py-2.5 text-sm font-semibold transition",
+            check && rowId && (check.canRefund || check.canEnqueue)
+              ? "mt-2 text-text-secondary hover:bg-brand-light hover:text-text-primary"
+              : "mt-5 bg-brand-gradient text-white shadow-sm hover:brightness-110",
+          )}
         >
           Close
         </button>
