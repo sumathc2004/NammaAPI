@@ -94,8 +94,8 @@ const pgColumns: ColumnSlot[] = [
 // Bill payments (APIClient/GetBillPaymentsDatewise): createdDatetime, billType (e.g. "CC Bill"),
 // shop / shopVendor (built server-side from StoreName and VendorName, either of which can be blank), MobileNumber, accountNO (last digits of the card/account; the full number
 // is dropped server-side), biller (built server-side: destNameForDisplay, else the biller code
-// destAddress), billPaidRefNo, UniqueId, amount, billPaidStatus (SUCCESS/PENDING/…). username,
-// bpay_billFetchId, channel and Id are left out.
+// destAddress), billPaidRefNo, amount, billPaidStatus (SUCCESS/PENDING/…). username, UniqueId (the
+// transaction ID — not shown, not exported), bpay_billFetchId, channel and Id are left out.
 // Order: Store (+ Vendor) and Mobile (+ Account) (each pair in one column, headed "Store / Vendor" and
 // "Mobile / Account" — the table adds the sub label itself — with the second value underneath) come
 // right after Type; Amount and Status are always the last two columns.
@@ -123,7 +123,6 @@ const billColumns: ColumnSlot[] = [
   },
   { id: "biller", label: "Biller", kind: "text", priority: 5, keys: [/^biller$/], format: "words" },
   { id: "reference", label: "Reference", kind: "text", priority: 6, keys: [/^billpaidrefno$/], format: "code", hideBelow: "xl" },
-  { id: "txnId", label: "Txn ID", kind: "text", priority: 7, keys: [/^uniqueid$/], format: "code", hideBelow: "2xl" },
   { id: "amount", label: "Amount", kind: "amount", priority: 8, keys: [/^amount$/] },
   { id: "status", label: "Status", kind: "status", priority: 9, keys: [/^billpaidstatus$/] },
 ];
