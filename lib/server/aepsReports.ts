@@ -1,6 +1,7 @@
 import "server-only";
 import { aepsRequest } from "@/lib/server/aepsClient";
 import type { DashboardSectionId } from "@/lib/data/dashboardNav";
+import { adminAccess } from "@/lib/auth/adminAccess";
 import { reportStartDate, toIsoDate } from "@/lib/reports/dates";
 import { hasStaleQueuedStatus, parseDate, type ReportRow, type ReportTable } from "@/lib/reports/table";
 import type { SessionCredentials } from "@/lib/server/session";
@@ -127,7 +128,9 @@ const REPORT_ENDPOINTS: Partial<Record<DashboardSectionId, ReportEndpoint>> = {
     },
   },
   // GET {CLIENT_API_BASE_URL}/APIClient/GetBillPaymentsDatewise?fromDate=&toDate=&userName= — bill
-  // payments (JSON array). No password; the username is always the logged-in account's, from the session.
+  // payments (JSON array). No password; the username is the logged-in account's, from the session — except for
+  // admins and accountants (decided from the session, never the request), who get every retailer's: without
+  // `userName` the vendor returns the whole platform.
   "bill-payments": {
     endpoint: "APIClient/GetBillPaymentsDatewise",
     api: "client",
@@ -135,7 +138,7 @@ const REPORT_ENDPOINTS: Partial<Record<DashboardSectionId, ReportEndpoint>> = {
     params: (credentials, fromDate, toDate) => ({
       fromDate: toVendorDate(fromDate),
       toDate: toVendorDate(toDate),
-      userName: credentials.userName,
+      ...(adminAccess(credentials) === "full" ? {} : { userName: credentials.userName }),
     }),
     transform: (row) => {
       const next = { ...row };
