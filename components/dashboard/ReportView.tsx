@@ -699,12 +699,27 @@ export function ReportView({
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
-  const views = reportViews[section];
-  const [viewId, setViewId] = useState(views?.[0]?.id);
-  const activeView = views?.find((v) => v.id === viewId);
   // The Refresh list (and so the Check icon): never a refunded transfer, and for a super-access account (not an
   // admin) only transfers from SUPER_ACCESS_REFRESH_FROM on.
   const profile = parseDemoSession(rawProfile);
+  const isSuperAccess = profile?.isSuperAccess === true;
+  const disputes = useBillDisputes(section === "bill-payments");
+  // Bill Payments gets a Disputes tab beside Failed for a super-access account: the payments that have a dispute.
+  const views = useMemo(() => {
+    const base = reportViews[section];
+    if (section !== "bill-payments" || !isSuperAccess || !base) return base;
+    return [
+      ...base,
+      {
+        id: "disputes",
+        label: "Disputes",
+        emptyText: "No disputes on bill payments for this period.",
+        match: (row: ReportRow) => disputes.byTxn.has(row.UniqueId),
+      },
+    ];
+  }, [section, isSuperAccess, disputes.byTxn]);
+  const [viewId, setViewId] = useState(views?.[0]?.id);
+  const activeView = views?.find((v) => v.id === viewId);
   const limitRefreshFrom = profile?.isSuperAccess === true && !profile.isAdmin ? SUPER_ACCESS_REFRESH_FROM : null;
   const canCheck = useCallback(
     (row: ReportRow) =>
@@ -772,7 +787,6 @@ export function ReportView({
   // Transfer only: the Check column's refresh icon asks the vendor (checkBulkpeStatus, through our API) for the
   // transfer's live status and shows the answer in a popup. It doesn't touch the table.
   // Bill Payments only: a Dispute column (raise a dispute on a bill payment, or see its status).
-  const disputes = useBillDisputes(section === "bill-payments");
   const [disputeRow, setDisputeRow] = useState<ReportRow | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [statusPopup, setStatusPopup] = useState<StatusPopup | null>(null);
