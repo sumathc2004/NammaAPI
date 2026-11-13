@@ -1,5 +1,5 @@
 import { buildMetadata } from "@/lib/metadata";
-import { ReportView } from "@/components/dashboard/ReportView";
+import { BillPaymentsView } from "@/components/dashboard/BillPaymentsView";
 
 export const metadata = buildMetadata({
   title: "Bill Payments",
@@ -9,5 +9,5 @@ export const metadata = buildMetadata({
 });
 
 export default function BillPaymentsPage() {
-  return <ReportView section="bill-payments" />;
+  return <BillPaymentsView />;
 }
