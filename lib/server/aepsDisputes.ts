@@ -74,3 +74,43 @@ export async function updateDispute(id: number, status: string, adminRemarks: st
   if (!result.ok) return { ok: false, error: result.error };
   return readWriteResult(`updateDispute ${id}`, result.body, "Dispute updated.", "The dispute could not be updated. Please try again.");
 }
+
+export type PaymentStatus = {
+  npciRef: string;
+  amount: string;
+  dateTime: string;
+  bankName: string;
+  cardLast4: string;
+  mobileNumber: string;
+  status: string;
+};
+export type PaymentStatusResult = { ok: true; payment: PaymentStatus } | { ok: false; error: string };
+
+/**
+ * GET {…/v5bc/api}/bill/getPaymentStatusByRef?refNo= — the live status of one bill payment, looked up by its
+ * transaction id (the "REFL…" UniqueId). Answers `{ status: "true", data: [{ UniqueId, npciRef, amount, dateTime,
+ * bankName, cardNumber, mobileNumber, status }] }`. No credentials. The UniqueId is not returned to the browser,
+ * and only the last 4 digits of a card number are kept.
+ */
+export async function fetchPaymentStatus(refNo: string): Promise<PaymentStatusResult> {
+  const result = await aepsRequest("getPaymentStatusByRef", { refNo }, { controller: "bill", prefer: "json" });
+  if (!result.ok) return { ok: false, error: result.error };
+  const body = result.body as { status?: unknown; data?: unknown } | null;
+  const first = Array.isArray(body?.data) ? (body.data[0] as Record<string, unknown> | undefined) : undefined;
+  if (!body || String(body.status).toLowerCase() !== "true" || !first || typeof first !== "object") {
+    console.error("AEPS getPaymentStatusByRef rejected:", JSON.stringify(body)?.slice(0, 300));
+    return { ok: false, error: "No payment was found for this dispute." };
+  }
+  return {
+    ok: true,
+    payment: {
+      npciRef: text(first.npciRef),
+      amount: text(first.amount),
+      dateTime: text(first.dateTime),
+      bankName: text(first.bankName),
+      cardLast4: text(first.cardNumber).replace(/\D/g, "").slice(-4),
+      mobileNumber: text(first.mobileNumber),
+      status: text(first.status),
+    },
+  };
+}

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CopyButton } from "@/components/dashboard/CopyButton";
 import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { StatusText, type StatusTone } from "@/components/dashboard/StatusText";
 import { DISPUTE_FILTERS, disputeView, isOpenDispute, type DisputeRow } from "@/lib/admin/disputes";
-import { formatDate } from "@/lib/reports/table";
+import { formatAmount, formatDate } from "@/lib/reports/table";
 import { cn } from "@/lib/cn";
 
 type Request = { status: string; nonce: number };
@@ -50,6 +50,25 @@ export function BillDisputesPanel() {
   const [open, setOpen] = useState<number | null>(null);
   const [resolving, setResolving] = useState<DisputeRow | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [payment, setPayment] = useState<PaymentPopup | null>(null);
+
+  async function checkPayment(row: DisputeRow) {
+    const v = disputeView(row);
+    if (!v.uniqueId) return;
+    setPayment({ status: "pending", reference: v.billPaidRefNo });
+    try {
+      const response = await fetch("/api/dashboard/bill-payments/disputes/payment-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uniqueId: v.uniqueId }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.ok && data.payment) setPayment({ status: "ok", reference: v.billPaidRefNo, payment: data.payment });
+      else setPayment({ status: "error", reference: v.billPaidRefNo, error: data?.error || "The status could not be checked." });
+    } catch {
+      setPayment({ status: "error", reference: v.billPaidRefNo, error: "Network error. Check your connection and try again." });
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -159,7 +178,24 @@ export function BillDisputesPanel() {
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
-                      {v.status && <StatusText tone={tone(v.status)}>{v.status}</StatusText>}
+                      <div className="flex items-center gap-1.5">
+                        {v.uniqueId && (
+                          <button
+                            type="button"
+                            onClick={() => checkPayment(row)}
+                            disabled={payment?.status === "pending"}
+                            aria-label="Check the live payment status"
+                            title="Check the live payment status"
+                            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-brand-border bg-white text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-60"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+                              <path d="M18 3v5h-5M6 21v-5h5" />
+                            </svg>
+                          </button>
+                        )}
+                        {v.status && <StatusText tone={tone(v.status)}>{v.status}</StatusText>}
+                      </div>
                       {isOpenDispute(v.status) && v.id && (
                         <button
                           type="button"
@@ -203,6 +239,8 @@ export function BillDisputesPanel() {
         )}
       </div>
 
+      {payment && <PaymentStatusDialog popup={payment} onClose={() => setPayment(null)} />}
+
       {resolving && (
         <ResolveDialog
           row={resolving}
@@ -215,6 +253,93 @@ export function BillDisputesPanel() {
         />
       )}
     </div>
+  );
+}
+
+type PaymentDetails = { npciRef: string; amount: string; dateTime: string; bankName: string; cardLast4: string; mobileNumber: string; status: string };
+type PaymentPopup =
+  | { status: "pending"; reference: string }
+  | { status: "ok"; reference: string; payment: PaymentDetails }
+  | { status: "error"; reference: string; error: string };
+
+/** The refresh icon's popup: the live status of the bill payment behind a dispute (vendor bill/getPaymentStatusByRef). The transaction id is never shown. */
+function PaymentStatusDialog({ popup, onClose }: { popup: PaymentPopup; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  const p = popup.status === "ok" ? popup.payment : null;
+  const row = (label: string, value: ReactNode) => (
+    <div className="flex items-center justify-between gap-4">
+      <dt className="shrink-0 text-text-secondary">{label}</dt>
+      <dd className="min-w-0 text-right text-text-primary">{value}</dd>
+    </div>
+  );
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === dialogRef.current) onClose();
+      }}
+      aria-labelledby="payment-status-title"
+      className="m-auto w-[calc(100%-2rem)] max-w-sm animate-dialog-in rounded-2xl border border-brand-border bg-white p-5 shadow-2xl shadow-brand-navy/30 backdrop:animate-backdrop-in backdrop:bg-brand-navy/50 backdrop:backdrop-blur-sm"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="payment-status-title" className="text-base font-semibold text-text-primary">
+          {popup.status === "pending" ? "Checking the status…" : popup.status === "ok" ? "Payment status" : "Couldn’t check the status"}
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-brand-light hover:text-text-primary"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      {popup.status === "pending" && <p className="mt-4 text-sm text-text-secondary">Asking the payments service for the latest status…</p>}
+      {popup.status === "error" && <p className="mt-4 text-sm text-red-600">{popup.error}</p>}
+      {p && (
+        <dl className="mt-4 space-y-2.5 text-sm">
+          {row("Amount", <span className="text-base font-bold tabular-nums">{p.amount ? formatAmount(p.amount) : "—"}</span>)}
+          {row("Status", p.status ? <StatusText>{p.status}</StatusText> : "—")}
+          {row("Bank", p.bankName || "—")}
+          {row("Card", p.cardLast4 ? `•••• ${p.cardLast4}` : "—")}
+          {row("Mobile", <span className="tabular-nums">{p.mobileNumber || "—"}</span>)}
+          {row("Time", <span className="tabular-nums">{p.dateTime ? formatDate(p.dateTime) : "—"}</span>)}
+          {row(
+            "NPCI ref",
+            p.npciRef ? (
+              <span className="inline-flex min-w-0 items-center font-mono text-xs">
+                <span className="truncate">{p.npciRef}</span>
+                <CopyButton value={p.npciRef} label="NPCI ref" className="size-4" />
+              </span>
+            ) : (
+              "—"
+            ),
+          )}
+          {popup.reference && (
+            <div className="border-t border-brand-border/70 pt-2.5">
+              {row(
+                "Bill reference",
+                <span className="inline-flex min-w-0 items-center font-mono text-xs">
+                  <span className="truncate">{popup.reference}</span>
+                  <CopyButton value={popup.reference} label="Bill reference" className="size-4" />
+                </span>,
+              )}
+            </div>
+          )}
+        </dl>
+      )}
+    </dialog>
   );
 }
 
