@@ -46,7 +46,7 @@ const tone = (status: string): StatusTone => (isOpenDispute(status) ? "pending" 
 
 /**
  * What the Dispute column shows for a bill payment: the dispute's status when there is one, else the Raise button,
- * with a round refresh icon beside it that asks the vendor for the payment's live status (bill/getPaymentStatusByRef)
+ * with, only while the dispute is open, a round refresh icon beside it that asks the vendor for the payment's live status (bill/getPaymentStatusByRef)
  * and shows it in a popup. The transaction id is sent to the server but never shown.
  */
 export function DisputeCell({ row, dispute, onRaise }: { row: ReportRow; dispute: DisputeView | undefined; onRaise: (row: ReportRow) => void }) {
@@ -86,19 +86,21 @@ export function DisputeCell({ row, dispute, onRaise }: { row: ReportRow; dispute
           Raise dispute
         </button>
       )}
-      <button
-        type="button"
-        onClick={check}
-        disabled={popup?.status === "pending"}
-        aria-label="Check the live payment status"
-        title="Check the live payment status"
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-brand-border bg-white text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-60"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
-          <path d="M18 3v5h-5M6 21v-5h5" />
-        </svg>
-      </button>
+      {dispute && isOpenDispute(dispute.status) && (
+        <button
+          type="button"
+          onClick={check}
+          disabled={popup?.status === "pending"}
+          aria-label="Check the live payment status"
+          title="Check the live payment status"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-brand-border bg-white text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-60"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+            <path d="M18 3v5h-5M6 21v-5h5" />
+          </svg>
+        </button>
+      )}
       {popup && <PaymentStatusDialog popup={popup} onClose={() => setPopup(null)} />}
     </span>
   );
