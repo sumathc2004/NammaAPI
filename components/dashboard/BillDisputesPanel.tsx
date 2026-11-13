@@ -127,78 +127,198 @@ export function BillDisputesPanel() {
           </p>
         )}
         {state.status === "ready" && shown.length > 0 && (
-          <ul className="divide-y divide-brand-border/70" aria-label="Bill payment disputes">
-            {shown.map((row, i) => {
-              const v = disputeView(row);
-              const expanded = open === i;
-              return (
-                <li key={`${v.id}-${i}`} className="px-4 py-3">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 md:grid-cols-[9rem_minmax(0,1fr)_auto]">
-                    <p className="col-span-2 text-[13px] font-semibold tabular-nums text-text-primary md:col-span-1">
-                      {v.createdAt ? formatDate(v.createdAt) : v.id ? `Dispute #${v.id}` : "—"}
-                    </p>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-text-primary">
-                        {v.userName || "—"}
-                        {v.id && <span className="ml-2 text-[11px] font-normal text-text-secondary">#{v.id}</span>}
-                      </p>
-                      {v.reason && <p className="mt-0.5 text-sm text-text-secondary">{v.reason}</p>}
-                      <span className="mt-1 flex flex-wrap items-center gap-x-3">
-                        <Refs label="Ref" value={v.billPaidRefNo} />
-                      </span>
-                      {(v.adminRemarks || v.resolvedAt) && (
-                        <p className="mt-1 text-xs text-text-secondary">
-                          {v.adminRemarks && (
+          <>
+            {/* From lg: a table with fixed column widths (nothing scrolls sideways; long text wraps). */}
+            <table className="hidden w-full table-fixed text-left text-sm lg:table">
+              <thead>
+                <tr className="border-b border-brand-border bg-brand-light/50 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                  <th scope="col" className="w-[11%] px-4 py-2.5">
+                    Raised
+                  </th>
+                  <th scope="col" className="w-[11%] px-2 py-2.5">
+                    Retailer
+                  </th>
+                  <th scope="col" className="w-[17%] px-2 py-2.5">
+                    Reference
+                  </th>
+                  <th scope="col" className="w-[20%] px-2 py-2.5">
+                    Reason
+                  </th>
+                  <th scope="col" className="w-[18%] px-2 py-2.5">
+                    Admin remarks
+                  </th>
+                  <th scope="col" className="w-[9%] px-2 py-2.5 text-center">
+                    Status
+                  </th>
+                  <th scope="col" className="w-[14%] px-4 py-2.5 text-right">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              {shown.map((row, i) => {
+                const v = disputeView(row);
+                const expanded = open === i;
+                const raisedAt = v.createdAt ? formatDate(v.createdAt) : "";
+                const split = raisedAt.lastIndexOf(", ");
+                return (
+                  <tbody key={`${v.id}-${i}`} className="border-b border-brand-border/70 last:border-b-0">
+                    <tr className="align-top">
+                      <td className="px-4 py-3 tabular-nums text-text-primary">
+                        {raisedAt ? (
+                          split < 0 ? (
+                            raisedAt
+                          ) : (
                             <>
-                              <span className="font-semibold text-text-primary">Remarks:</span> {v.adminRemarks}
+                              <span className="block whitespace-nowrap font-semibold">{raisedAt.slice(0, split)}</span>
+                              <span className="block text-xs text-text-secondary">{raisedAt.slice(split + 2)}</span>
                             </>
+                          )
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-2 py-3">
+                        <p className="font-medium tabular-nums text-text-primary">{v.userName || "—"}</p>
+                        {v.id && <p className="text-xs text-text-secondary">#{v.id}</p>}
+                      </td>
+                      <td className="px-2 py-3">
+                        {v.billPaidRefNo ? (
+                          <span className="inline-flex max-w-full items-center font-mono text-[11px] text-text-primary">
+                            <span className="break-all">{v.billPaidRefNo}</span>
+                            <CopyButton value={v.billPaidRefNo} label="Reference" className="size-3.5 shrink-0" />
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="break-words px-2 py-3 text-text-primary">{v.reason || "—"}</td>
+                      <td className="px-2 py-3 text-xs text-text-secondary">
+                        {v.adminRemarks ? <p className="break-words text-sm text-text-primary">{v.adminRemarks}</p> : "—"}
+                        {v.resolvedAt && <p className="mt-0.5 tabular-nums">Resolved {formatDate(v.resolvedAt)}</p>}
+                      </td>
+                      <td className="px-2 py-3 text-center">{v.status ? <StatusText tone={tone(v.status)}>{v.status}</StatusText> : "—"}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex flex-col items-end gap-1.5">
+                          {isOpenDispute(v.status) && v.id && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNotice(null);
+                                setResolving(row);
+                              }}
+                              className="rounded-md bg-brand-gradient px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:brightness-110"
+                            >
+                              Resolve
+                            </button>
                           )}
-                          {v.resolvedAt && <span className="ml-2 tabular-nums">· Resolved {formatDate(v.resolvedAt)}</span>}
+                          <button
+                            type="button"
+                            onClick={() => setOpen(expanded ? null : i)}
+                            aria-expanded={expanded}
+                            className="text-[11px] font-medium text-brand-primary hover:underline"
+                          >
+                            {expanded ? "Hide fields" : "All fields"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr>
+                        <td colSpan={7} className="px-4 pb-3">
+                          <dl className="grid gap-x-6 gap-y-1 rounded-lg bg-brand-light/50 p-3 text-xs sm:grid-cols-2">
+                            {Object.entries(row)
+                              .filter(([key]) => !/^uniqueid$/i.test(key.replace(/[^a-z0-9]/gi, "")))
+                              .map(([key, value]) => (
+                                <div key={key} className="flex min-w-0 justify-between gap-3">
+                                  <dt className="shrink-0 text-text-secondary">{key}</dt>
+                                  <dd className="min-w-0 truncate text-right font-mono text-text-primary" title={value}>
+                                    {value || "—"}
+                                  </dd>
+                                </div>
+                              ))}
+                          </dl>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                );
+              })}
+            </table>
+
+            {/* Below lg: one card per dispute. */}
+            <ul className="divide-y divide-brand-border/70 lg:hidden" aria-label="Bill payment disputes">
+              {shown.map((row, i) => {
+                const v = disputeView(row);
+                const expanded = open === i;
+                return (
+                  <li key={`${v.id}-${i}`} className="px-4 py-3">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 md:grid-cols-[9rem_minmax(0,1fr)_auto]">
+                      <p className="col-span-2 text-[13px] font-semibold tabular-nums text-text-primary md:col-span-1">
+                        {v.createdAt ? formatDate(v.createdAt) : v.id ? `Dispute #${v.id}` : "—"}
+                      </p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary">
+                          {v.userName || "—"}
+                          {v.id && <span className="ml-2 text-[11px] font-normal text-text-secondary">#{v.id}</span>}
                         </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                      {v.status && <StatusText tone={tone(v.status)}>{v.status}</StatusText>}
-                      {isOpenDispute(v.status) && v.id && (
+                        {v.reason && <p className="mt-0.5 text-sm text-text-secondary">{v.reason}</p>}
+                        <span className="mt-1 flex flex-wrap items-center gap-x-3">
+                          <Refs label="Ref" value={v.billPaidRefNo} />
+                        </span>
+                        {(v.adminRemarks || v.resolvedAt) && (
+                          <p className="mt-1 text-xs text-text-secondary">
+                            {v.adminRemarks && (
+                              <>
+                                <span className="font-semibold text-text-primary">Remarks:</span> {v.adminRemarks}
+                              </>
+                            )}
+                            {v.resolvedAt && <span className="ml-2 tabular-nums">· Resolved {formatDate(v.resolvedAt)}</span>}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5">
+                        {v.status && <StatusText tone={tone(v.status)}>{v.status}</StatusText>}
+                        {isOpenDispute(v.status) && v.id && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNotice(null);
+                              setResolving(row);
+                            }}
+                            className="rounded-md bg-brand-gradient px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:brightness-110"
+                          >
+                            Resolve
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => {
-                            setNotice(null);
-                            setResolving(row);
-                          }}
-                          className="rounded-md bg-brand-gradient px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:brightness-110"
+                          onClick={() => setOpen(expanded ? null : i)}
+                          aria-expanded={expanded}
+                          className="text-[11px] font-medium text-brand-primary hover:underline"
                         >
-                          Resolve
+                          {expanded ? "Hide fields" : "All fields"}
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setOpen(expanded ? null : i)}
-                        aria-expanded={expanded}
-                        className="text-[11px] font-medium text-brand-primary hover:underline"
-                      >
-                        {expanded ? "Hide fields" : "All fields"}
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                  {expanded && (
-                    <dl className="mt-3 grid gap-x-6 gap-y-1 rounded-lg bg-brand-light/50 p-3 text-xs sm:grid-cols-2">
-                      {Object.entries(row)
-                        .filter(([key]) => !/^uniqueid$/i.test(key.replace(/[^a-z0-9]/gi, "")))
-                        .map(([key, value]) => (
-                        <div key={key} className="flex min-w-0 justify-between gap-3">
-                          <dt className="shrink-0 text-text-secondary">{key}</dt>
-                          <dd className="min-w-0 truncate text-right font-mono text-text-primary" title={value}>
-                            {value || "—"}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                    {expanded && (
+                      <dl className="mt-3 grid gap-x-6 gap-y-1 rounded-lg bg-brand-light/50 p-3 text-xs sm:grid-cols-2">
+                        {Object.entries(row)
+                          .filter(([key]) => !/^uniqueid$/i.test(key.replace(/[^a-z0-9]/gi, "")))
+                          .map(([key, value]) => (
+                          <div key={key} className="flex min-w-0 justify-between gap-3">
+                            <dt className="shrink-0 text-text-secondary">{key}</dt>
+                            <dd className="min-w-0 truncate text-right font-mono text-text-primary" title={value}>
+                              {value || "—"}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </div>
 

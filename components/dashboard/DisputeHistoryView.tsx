@@ -59,7 +59,7 @@ export function DisputeHistoryView() {
   }, [rows, filter, query]);
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
+    <div className="flex w-full flex-col gap-3">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand-primary/25 md:h-10 md:w-10">
           <SectionIcon id="dispute-history" className="h-5 w-5" />
@@ -67,8 +67,8 @@ export function DisputeHistoryView() {
         <h1 className="text-lg font-bold tracking-tight text-text-primary sm:text-2xl">Dispute History</h1>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm">
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-brand-border px-4 py-3">
+      <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 border-b border-brand-border px-4 py-3">
           <FilterSelect
             id="dispute-history-filter"
             label="Show"
@@ -88,7 +88,7 @@ export function DisputeHistoryView() {
               setQuery(e.target.value);
               setShown(PAGE_ROWS);
             }}
-            placeholder="Search retailer, mobile, reference, bank, amount"
+            placeholder="Search entries"
             aria-label="Search the dispute history"
             className="h-9 min-w-0 flex-1 rounded-lg border border-brand-border bg-white px-3 text-sm text-text-primary placeholder:text-text-secondary focus:border-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/15 md:w-80 md:flex-none"
           />
@@ -105,86 +105,170 @@ export function DisputeHistoryView() {
           </button>
         </div>
 
-        <div className="scrollbar-light min-h-0 flex-1 overflow-y-auto">
-          {state.status === "loading" && (
-            <div className="space-y-2 p-5" aria-busy="true" aria-label="Loading the dispute history">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-lg bg-brand-light/60" />
-              ))}
-            </div>
-          )}
-          {state.status === "error" && (
-            <p role="alert" className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {state.message}
-            </p>
-          )}
-          {state.status === "ready" && visible.length === 0 && (
-            <p className="px-5 py-14 text-center text-sm text-text-secondary">
-              {rows.length === 0 ? "Nothing here yet." : "No entries match."}
-            </p>
-          )}
-          {state.status === "ready" && visible.length > 0 && (
-            <>
-              <ul className="divide-y divide-brand-border/70" aria-label="Dispute history">
+        {state.status === "loading" && (
+          <div className="space-y-2 p-5" aria-busy="true" aria-label="Loading the dispute history">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-brand-light/60" />
+            ))}
+          </div>
+        )}
+        {state.status === "error" && (
+          <p role="alert" className="m-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {state.message}
+          </p>
+        )}
+        {state.status === "ready" && visible.length === 0 && (
+          <p className="px-5 py-14 text-center text-sm text-text-secondary">{rows.length === 0 ? "Nothing here yet." : "No entries match."}</p>
+        )}
+        {state.status === "ready" && visible.length > 0 && (
+          <>
+            {/* From lg: a table with fixed column widths (nothing scrolls sideways; long text wraps). */}
+            <table className="hidden w-full table-fixed text-left text-sm lg:table">
+              <thead>
+                <tr className="border-b border-brand-border bg-brand-light/50 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                  <th scope="col" className="w-[11%] px-4 py-2.5">
+                    Date &amp; Time
+                  </th>
+                  <th scope="col" className="w-[14%] px-2 py-2.5">
+                    Retailer
+                  </th>
+                  <th scope="col" className="w-[9%] px-2 py-2.5">
+                    Mobile
+                  </th>
+                  <th scope="col" className="w-[13%] px-2 py-2.5">
+                    Bank / Card
+                  </th>
+                  <th scope="col" className="w-[17%] px-2 py-2.5">
+                    Reference
+                  </th>
+                  <th scope="col" className="w-[9%] px-2 py-2.5 text-right">
+                    Amount
+                  </th>
+                  <th scope="col" className="w-[11%] px-2 py-2.5 text-center">
+                    Dispute
+                  </th>
+                  <th scope="col" className="w-[16%] px-4 py-2.5">
+                    Reason
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brand-border/70">
                 {visible.slice(0, shown).map((row, i) => (
-                  <li key={`${row.billPaidRefNo}-${i}`} className="px-4 py-3">
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 md:grid-cols-[9rem_minmax(0,1fr)_auto]">
-                      <p className="col-span-2 text-[13px] font-semibold tabular-nums text-text-primary md:col-span-1">
-                        {row.createdAt ? formatDate(row.createdAt) : "—"}
-                      </p>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-text-primary">
-                          {row.retailerName || "—"}
-                          {row.storeName && <span className="ml-2 text-xs font-normal italic text-brand-primary">{row.storeName}</span>}
-                        </p>
-                        <p className="mt-0.5 text-xs tabular-nums text-text-secondary">
-                          {[row.mobileNumber, row.bankName, row.cardLast4 && `•••• ${row.cardLast4}`].filter(Boolean).join(" · ")}
-                        </p>
-                        {row.billPaidRefNo && (
-                          <span className="mt-1 inline-flex min-w-0 items-center font-mono text-[11px] text-text-secondary">
-                            <span className="mr-1 font-sans text-[9px] uppercase tracking-wide">Ref</span>
-                            <span className="truncate">{row.billPaidRefNo}</span>
-                            <CopyButton value={row.billPaidRefNo} label="Reference" className="size-3.5" />
-                          </span>
-                        )}
-                        {row.disputeRaised && (row.disputeReason || row.disputeRaisedAt) && (
-                          <p className="mt-1 text-xs text-text-secondary">
-                            {row.disputeReason && (
-                              <>
-                                <span className="font-semibold text-text-primary">Reason:</span> {row.disputeReason}
-                              </>
-                            )}
-                            {row.disputeRaisedAt && <span className="ml-2 tabular-nums">· Raised {formatDate(row.disputeRaisedAt)}</span>}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-sm font-bold tabular-nums text-text-primary">{row.amount ? formatAmount(row.amount) : "—"}</span>
-                        {row.disputeRaised ? (
-                          <StatusText tone={isHistoryOpen(row) ? "pending" : "success"}>{`Dispute ${(row.disputeStatus || "raised").toLowerCase()}`}</StatusText>
-                        ) : (
-                          <StatusText tone="neutral">No dispute</StatusText>
-                        )}
-                      </div>
-                    </div>
-                  </li>
+                  <tr key={`${row.billPaidRefNo}-${i}`} className="align-top">
+                    <td className="px-4 py-3 tabular-nums text-text-primary">
+                      {row.createdAt ? <DateStack value={row.createdAt} /> : "—"}
+                    </td>
+                    <td className="px-2 py-3">
+                      <p className="break-words font-medium text-text-primary">{row.retailerName || "—"}</p>
+                      {row.storeName && <p className="break-words text-xs italic text-brand-primary">{row.storeName}</p>}
+                    </td>
+                    <td className="px-2 py-3 tabular-nums text-text-primary">{row.mobileNumber || "—"}</td>
+                    <td className="px-2 py-3">
+                      <p className="break-words text-text-primary">{row.bankName || "—"}</p>
+                      {row.cardLast4 && <p className="text-xs tabular-nums text-text-secondary">•••• {row.cardLast4}</p>}
+                    </td>
+                    <td className="px-2 py-3">
+                      {row.billPaidRefNo ? (
+                        <span className="inline-flex max-w-full items-center font-mono text-[11px] text-text-primary">
+                          <span className="break-all">{row.billPaidRefNo}</span>
+                          <CopyButton value={row.billPaidRefNo} label="Reference" className="size-3.5 shrink-0" />
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-2 py-3 text-right font-semibold tabular-nums text-text-primary">{row.amount ? formatAmount(row.amount) : "—"}</td>
+                    <td className="px-2 py-3 text-center">
+                      <DisputePill row={row} />
+                    </td>
+                    <td className="px-4 py-3 text-xs text-text-secondary">
+                      {row.disputeRaised ? (
+                        <>
+                          <p className="break-words text-text-primary">{row.disputeReason || "—"}</p>
+                          {row.disputeRaisedAt && <p className="mt-0.5 tabular-nums">Raised {formatDate(row.disputeRaisedAt)}</p>}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
                 ))}
-              </ul>
-              {visible.length > shown && (
-                <div className="p-4 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setShown((n) => n + PAGE_ROWS)}
-                    className="rounded-lg border border-brand-border bg-white px-4 py-2 text-sm font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light"
-                  >
-                    Show more ({(visible.length - shown).toLocaleString("en-IN")} left)
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+              </tbody>
+            </table>
+
+            {/* Below lg: one card per entry. */}
+            <ul className="divide-y divide-brand-border/70 lg:hidden" aria-label="Dispute history">
+              {visible.slice(0, shown).map((row, i) => (
+                <li key={`${row.billPaidRefNo}-${i}`} className="space-y-1.5 px-4 py-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-text-primary">
+                        {row.retailerName || "—"}
+                        {row.storeName && <span className="ml-2 text-xs font-normal italic text-brand-primary">{row.storeName}</span>}
+                      </p>
+                      <p className="text-xs tabular-nums text-text-secondary">{row.createdAt ? formatDate(row.createdAt) : "—"}</p>
+                    </div>
+                    <span className="shrink-0 font-bold tabular-nums text-text-primary">{row.amount ? formatAmount(row.amount) : "—"}</span>
+                  </div>
+                  <p className="text-xs tabular-nums text-text-secondary">
+                    {[row.mobileNumber, row.bankName, row.cardLast4 && `•••• ${row.cardLast4}`].filter(Boolean).join(" · ")}
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    {row.billPaidRefNo ? (
+                      <span className="inline-flex min-w-0 items-center font-mono text-[11px] text-text-secondary">
+                        <span className="truncate">{row.billPaidRefNo}</span>
+                        <CopyButton value={row.billPaidRefNo} label="Reference" className="size-3.5" />
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+                    <DisputePill row={row} />
+                  </div>
+                  {row.disputeRaised && row.disputeReason && (
+                    <p className="text-xs text-text-secondary">
+                      <span className="font-semibold text-text-primary">Reason:</span> {row.disputeReason}
+                      {row.disputeRaisedAt && <span className="ml-2 tabular-nums">· Raised {formatDate(row.disputeRaisedAt)}</span>}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            {visible.length > shown && (
+              <div className="border-t border-brand-border/70 p-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShown((n) => n + PAGE_ROWS)}
+                  className="rounded-lg border border-brand-border bg-white px-4 py-2 text-sm font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light"
+                >
+                  Show more ({(visible.length - shown).toLocaleString("en-IN")} left)
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
+  );
+}
+
+function DisputePill({ row }: { row: DisputeHistoryRow }) {
+  return row.disputeRaised ? (
+    <StatusText tone={isHistoryOpen(row) ? "pending" : "success"}>{`Dispute ${(row.disputeStatus || "raised").toLowerCase()}`}</StatusText>
+  ) : (
+    <StatusText tone="neutral">No dispute</StatusText>
+  );
+}
+
+/** The date on one line and the time under it ("13 Nov 2026" / "4:09 pm"). */
+function DateStack({ value }: { value: string }) {
+  const full = formatDate(value);
+  const at = full.lastIndexOf(", ");
+  if (at < 0) return <>{full}</>;
+  return (
+    <>
+      <span className="block whitespace-nowrap font-semibold">{full.slice(0, at)}</span>
+      <span className="block text-xs text-text-secondary">{full.slice(at + 2)}</span>
+    </>
   );
 }
