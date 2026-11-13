@@ -75,6 +75,12 @@ const paths = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  "dispute-history": (
+    <>
+      <path d="M12 3L19 6V11C19 15.5 16 19.3 12 20.5C8 19.3 5 15.5 5 11V6L12 3Z" />
+      <path d="M12 8v4.5M12 15.5h.01" />
+    </>
+  ),
   "super-access": (
     <>
       <circle cx="8.5" cy="14.5" r="3.5" />

@@ -64,6 +64,12 @@ export const dashboardSections = [
     role: "adminOrAccountant",
   },
   {
+    id: "dispute-history",
+    label: "Dispute History",
+    description: "Bill payments marked failed, with the dispute raised on each one and its status.",
+    role: "adminOrAccountant",
+  },
+  {
     id: "super-access",
     label: "Super Access",
     description: "BUL account balances and the PG tally.",

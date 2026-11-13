@@ -1,8 +1,10 @@
 import "server-only";
 import { aepsRequest } from "@/lib/server/aepsClient";
 import type { DisputeRow } from "@/lib/admin/disputes";
+import type { DisputeHistoryRow } from "@/lib/admin/disputeHistory";
 
 export type DisputesResult = { ok: true; rows: DisputeRow[] } | { ok: false; error: string };
+export type DisputeHistoryResult = { ok: true; rows: DisputeHistoryRow[] } | { ok: false; error: string };
 export type DisputeUpdateResult = { ok: true; message: string } | { ok: false; error: string };
 
 const text = (value: unknown): string =>
@@ -113,4 +115,42 @@ export async function fetchPaymentStatus(refNo: string): Promise<PaymentStatusRe
       status: text(first.status),
     },
   };
+}
+
+/**
+ * GET {…/v5bc/api}/bill/getMarkFailedWithDispute?userName=&password= — the bill payments marked failed, each with
+ * the dispute raised on it, if any: `{ status: "true", data: [{ UniqueId, billPaidRefNo, amount, createdDatetime,
+ * MobileNumber, bankName, fullCardNumber, retailerName, storeName, DisputeRaised (0/1), DisputeStatus, DisputeRaisedAt,
+ * DisputeReason }] }`. Takes the admin's own login (query string, so the URL is never logged). The transaction id
+ * (`UniqueId`) is dropped here and the card is cut to its last 4 digits before anything reaches the browser.
+ */
+export async function fetchDisputeHistory(credentials: { userName: string; password: string }): Promise<DisputeHistoryResult> {
+  const result = await aepsRequest(
+    "getMarkFailedWithDispute",
+    { userName: credentials.userName, password: credentials.password },
+    { controller: "bill", prefer: "json" },
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  const body = result.body as { status?: unknown; data?: unknown } | null;
+  if (!body || String(body.status).toLowerCase() !== "true" || !Array.isArray(body.data)) {
+    console.error("AEPS getMarkFailedWithDispute rejected:", JSON.stringify(body)?.slice(0, 200));
+    return { ok: false, error: "The dispute history could not be loaded." };
+  }
+  const rows = body.data
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => ({
+      billPaidRefNo: text(item.billPaidRefNo),
+      amount: text(item.amount),
+      createdAt: text(item.createdDatetime),
+      mobileNumber: text(item.MobileNumber),
+      bankName: text(item.bankName),
+      cardLast4: text(item.fullCardNumber).replace(/D/g, "").slice(-4),
+      retailerName: text(item.retailerName).trim(),
+      storeName: text(item.storeName).trim(),
+      disputeRaised: Number(item.DisputeRaised) === 1 || item.DisputeRaised === true || String(item.DisputeRaised).toLowerCase() === "true",
+      disputeStatus: text(item.DisputeStatus),
+      disputeRaisedAt: text(item.DisputeRaisedAt),
+      disputeReason: text(item.DisputeReason),
+    }));
+  return { ok: true, rows };
 }
