@@ -938,14 +938,18 @@ export function ReportView({
     return match ? table.rows.filter(match) : table.rows;
   }, [table, activeView, section, canCheck]);
 
-  const filteredRows = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return viewRows;
-    const matches = (row: ReportRow, key?: string) => !!key && (row[key] ?? "").toLowerCase().includes(needle);
-    const extraPattern = EXTRA_SEARCH_FIELDS[section];
-    const extraKeys = extraPattern && table ? table.columns.filter((key) => extraPattern.test(key.toLowerCase().replace(/[^a-z0-9]/g, ""))) : [];
-    return viewRows.filter((row) => columns.some((c) => matches(row, c.key) || matches(row, c.subKey)) || extraKeys.some((key) => matches(row, key)));
-  }, [viewRows, columns, query, section, table]);
+  const searchRows = useCallback(
+    (rows: ReportRow[]) => {
+      const needle = query.trim().toLowerCase();
+      if (!needle) return rows;
+      const matches = (row: ReportRow, key?: string) => !!key && (row[key] ?? "").toLowerCase().includes(needle);
+      const extraPattern = EXTRA_SEARCH_FIELDS[section];
+      const extraKeys = extraPattern && table ? table.columns.filter((key) => extraPattern.test(key.toLowerCase().replace(/[^a-z0-9]/g, ""))) : [];
+      return rows.filter((row) => columns.some((c) => matches(row, c.key) || matches(row, c.subKey)) || extraKeys.some((key) => matches(row, key)));
+    },
+    [columns, query, section, table],
+  );
+  const filteredRows = useMemo(() => searchRows(viewRows), [searchRows, viewRows]);
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -996,11 +1000,13 @@ export function ReportView({
 
   function exportCsv() {
     // The byte order mark tells Excel the file is UTF-8; without it "•" and "₹" come out garbled.
-    const blob = new Blob([String.fromCharCode(0xfeff), toCsv(columns, filteredRows)], { type: "text/csv;charset=utf-8" });
+    // A super-access account always exports everything for the dates (the search still applies), whatever tab is selected.
+    const exportAll = isSuperAccess && !!table;
+    const blob = new Blob([String.fromCharCode(0xfeff), toCsv(columns, exportAll ? searchRows(table.rows) : filteredRows)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    const viewSuffix = activeView?.match ? `_${activeView.id}` : "";
+    const viewSuffix = activeView?.match && !isSuperAccess ? `_${activeView.id}` : "";
     link.download = `${section}${viewSuffix}_${range.from}_${range.to}.csv`;
     link.click();
     URL.revokeObjectURL(url);
