@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/dashboard/CopyButton";
 import { StatusText } from "@/components/dashboard/StatusText";
 import { formatAmount, formatDate } from "@/lib/reports/table";
@@ -12,8 +12,18 @@ export type PaymentPopup =
   | { status: "error"; reference: string; error: string };
 
 /** The refresh icon's popup (Bill Payments, beside Raise dispute): the live status of a bill payment (vendor bill/getPaymentStatusByRef). The transaction id is never shown. */
-export function PaymentStatusDialog({ popup, onClose }: { popup: PaymentPopup; onClose: () => void }) {
+export function PaymentStatusDialog({
+  popup,
+  onClose,
+  onRefund,
+}: {
+  popup: PaymentPopup;
+  onClose: () => void;
+  /** Given only to admins and accountants: asks the server to refund this payment (vendor bill/refund). */
+  onRefund?: () => Promise<{ ok: boolean; message: string }>;
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [refund, setRefund] = useState<{ step: "idle" | "confirm" | "busy" | "done" | "error"; message?: string }>({ step: "idle" });
   useEffect(() => {
     const dialog = dialogRef.current;
     if (dialog && !dialog.open) dialog.showModal();
@@ -87,6 +97,56 @@ export function PaymentStatusDialog({ popup, onClose }: { popup: PaymentPopup; o
             </div>
           )}
         </dl>
+      )}
+
+      {p && onRefund && p.status.trim().toUpperCase() === "FAILED" && (
+        <div className="mt-5">
+          {refund.step === "done" ? (
+            <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              {refund.message}
+            </p>
+          ) : (
+            <>
+              {refund.step === "error" && (
+                <p role="alert" className="mb-2 text-sm text-red-600">
+                  {refund.message}
+                </p>
+              )}
+              {refund.step === "confirm" && (
+                <p className="mb-2 text-sm text-text-primary">
+                  Refund <span className="font-semibold tabular-nums">{p.amount ? formatAmount(p.amount) : "this payment"}</span> to the retailer&apos;s wallet?
+                </p>
+              )}
+              <div className="flex gap-2">
+                {refund.step === "confirm" && (
+                  <button
+                    type="button"
+                    onClick={() => setRefund({ step: "idle" })}
+                    className="flex-1 rounded-lg border border-brand-border bg-white py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:bg-brand-light"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={refund.step === "busy"}
+                  onClick={async () => {
+                    if (refund.step !== "confirm") {
+                      setRefund({ step: "confirm" });
+                      return;
+                    }
+                    setRefund({ step: "busy" });
+                    const result = await onRefund();
+                    setRefund({ step: result.ok ? "done" : "error", message: result.message });
+                  }}
+                  className="flex-1 rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60"
+                >
+                  {refund.step === "busy" ? "Refunding…" : refund.step === "confirm" ? "Yes, refund" : "Refund"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       )}
     </dialog>
   );

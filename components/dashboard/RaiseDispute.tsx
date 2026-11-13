@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { PaymentStatusDialog, type PaymentPopup } from "@/components/dashboard/PaymentStatusDialog";
 import { StatusText, type StatusTone } from "@/components/dashboard/StatusText";
 import { disputeView, isOpenDispute, type DisputeRow, type DisputeView } from "@/lib/admin/disputes";
 import { formatAmount, type ReportRow } from "@/lib/reports/table";
 import { cn } from "@/lib/cn";
+import { parseDemoSession, readDemoSessionRaw, subscribeDemoSession } from "@/lib/auth/demoSession";
+import { hasPageRole } from "@/lib/auth/adminAccess";
 
 /**
  * The bill payment disputes the signed-in account can see (its own; an admin or accountant gets every retailer's),
@@ -51,9 +53,27 @@ const tone = (status: string): StatusTone => (isOpenDispute(status) ? "pending" 
  */
 export function DisputeCell({ row, dispute, onRaise }: { row: ReportRow; dispute: DisputeView | undefined; onRaise: (row: ReportRow) => void }) {
   const [popup, setPopup] = useState<PaymentPopup | null>(null);
+  const profileRaw = useSyncExternalStore(subscribeDemoSession, readDemoSessionRaw, () => undefined);
+  // Only admins and accountants can refund a failed payment (the server checks the session again).
+  const canRefund = hasPageRole(parseDemoSession(profileRaw), "adminOrAccountant");
   const uniqueId = row.UniqueId;
   const reference = row.billPaidRefNo ?? "";
   if (!uniqueId) return null;
+
+  async function refund(): Promise<{ ok: boolean; message: string }> {
+    try {
+      const response = await fetch("/api/dashboard/bill-payments/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uniqueId }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.ok) return { ok: true, message: data.message || "Refund processed." };
+      return { ok: false, message: data?.error || "The refund could not be processed." };
+    } catch {
+      return { ok: false, message: "Network error. Check your connection and try again." };
+    }
+  }
 
   async function check() {
     setPopup({ status: "pending", reference });
@@ -101,7 +121,7 @@ export function DisputeCell({ row, dispute, onRaise }: { row: ReportRow; dispute
           </svg>
         </button>
       )}
-      {popup && <PaymentStatusDialog popup={popup} onClose={() => setPopup(null)} />}
+      {popup && <PaymentStatusDialog popup={popup} onClose={() => setPopup(null)} onRefund={canRefund ? refund : undefined} />}
     </span>
   );
 }

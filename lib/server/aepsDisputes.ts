@@ -154,3 +154,30 @@ export async function fetchDisputeHistory(credentials: { userName: string; passw
     }));
   return { ok: true, rows };
 }
+
+/**
+ * POST {…/v5bc/api}/bill/refund with a JSON body `{ userName, password, uniqueId }` — refunds a failed bill payment
+ * to the retailer's wallet. Unlike the dispute calls this one takes the signed-in admin's own login (in the body, so
+ * the password never appears in a URL); a wrong login answers `{ status: "false", message: "Invalid username or
+ * password" }`. The vendor's own message is shown when it is short and plain; anything that looks like a database
+ * error is logged and replaced by a generic one.
+ */
+export async function refundBillPayment(credentials: { userName: string; password: string }, uniqueId: string): Promise<DisputeUpdateResult> {
+  const result = await aepsRequest("refund", {}, {
+    controller: "bill",
+    method: "POST",
+    prefer: "json",
+    body: { userName: credentials.userName, password: credentials.password, uniqueId },
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+  const body = result.body as { status?: unknown; message?: unknown; data?: unknown } | null;
+  const first = Array.isArray(body?.data) ? (body.data[0] as { Success?: unknown; Message?: unknown } | undefined) : undefined;
+  const message = text(body?.message ?? first?.Message).trim();
+  const ok = body !== null && String(body.status).toLowerCase() === "true" && first?.Success !== false;
+  const plain = message.length > 0 && message.length <= 200 && !/sql|insert|update |column|table|exception|constraint|stack/i.test(message);
+  if (!ok) {
+    console.error("AEPS bill/refund rejected:", JSON.stringify(body)?.slice(0, 300));
+    return { ok: false, error: plain ? message : "The refund could not be processed. Please try again." };
+  }
+  return { ok: true, message: plain ? message : "Refund processed." };
+}
