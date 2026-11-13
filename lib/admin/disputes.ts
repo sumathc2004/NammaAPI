@@ -32,6 +32,7 @@ export type DisputeView = {
   status: string;
   adminRemarks: string;
   createdAt: string;
+  resolvedAt: string;
 };
 
 export function disputeView(row: DisputeRow): DisputeView {
@@ -44,6 +45,7 @@ export function disputeView(row: DisputeRow): DisputeView {
     status: pick(row, /^status$/, /^disputestatus$/),
     adminRemarks: pick(row, /^adminremarks$/, /^remarks$/),
     createdAt: pick(row, /^createdat$/, /^createddate$/, /^createdon$/, /^raisedat$/, /^createddatetime$/, /^date$/),
+    resolvedAt: pick(row, /^resolvedat$/, /^resolveddate$/, /^resolvedon$/),
   };
 }
 

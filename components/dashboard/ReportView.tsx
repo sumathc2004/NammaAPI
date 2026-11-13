@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { SectionIcon } from "@/components/dashboard/SectionIcon";
 import { getDashboardSection, type DashboardSectionId } from "@/lib/data/dashboardNav";
@@ -11,6 +11,7 @@ import { FilterSelect } from "@/components/dashboard/FilterSelect";
 import { RowTime } from "@/components/dashboard/RowTime";
 import { StatusText, rowTint } from "@/components/dashboard/StatusText";
 import { CopyButton } from "@/components/dashboard/CopyButton";
+import { DisputeCell, RaiseDisputeDialog, useBillDisputes } from "@/components/dashboard/RaiseDispute";
 import { shortCode } from "@/lib/reports/shortCode";
 import {
   amountTone,
@@ -299,6 +300,7 @@ function RowCard({
   checkingId,
   onCheck,
   checkable,
+  extra,
   timeOnly = false,
 }: {
   row: ReportRow;
@@ -310,6 +312,8 @@ function RowCard({
   onCheck: (uniqueTxnId: string) => void;
   /** Show the Check icon (the row is in the Refresh list). */
   checkable: boolean;
+  /** Something extra beside the badges (Bill Payments: the dispute button or status). */
+  extra?: ReactNode;
   pendingAction: { uniqueTxnId: string; action: TransferAction } | null;
   onAction: (action: TransferAction, uniqueTxnId: string, id: string) => void;
   /** Show just the time on the date line (single-day compact panel). */
@@ -359,6 +363,7 @@ function RowCard({
                 {checkable && row.UniqueTxnId && (
                   <CheckStatusButton checking={checkingId === row.UniqueTxnId} onCheck={() => onCheck(row.UniqueTxnId)} />
                 )}
+                {extra}
               </span>
             )}
             {queueId && (
@@ -766,6 +771,9 @@ export function ReportView({
 
   // Transfer only: the Check column's refresh icon asks the vendor (checkBulkpeStatus, through our API) for the
   // transfer's live status and shows the answer in a popup. It doesn't touch the table.
+  // Bill Payments only: a Dispute column (raise a dispute on a bill payment, or see its status).
+  const disputes = useBillDisputes(section === "bill-payments");
+  const [disputeRow, setDisputeRow] = useState<ReportRow | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [statusPopup, setStatusPopup] = useState<StatusPopup | null>(null);
   async function checkStatus(uniqueTxnId: string) {
@@ -1256,6 +1264,7 @@ export function ReportView({
                 checkingId={checkingId}
                 onCheck={checkStatus}
                 checkable={canCheck(row)}
+                extra={section === "bill-payments" ? <DisputeCell row={row} dispute={disputes.byTxn.get(row.UniqueId)} onRaise={setDisputeRow} /> : undefined}
                 timeOnly={timeOnly}
               />
             ))}
@@ -1367,6 +1376,11 @@ export function ReportView({
                           Check
                         </th>
                       )}
+                      {section === "bill-payments" && column.kind === "status" && (
+                        <th scope="col" className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                          Dispute
+                        </th>
+                      )}
                     </Fragment>
                   ))}
                 </tr>
@@ -1434,6 +1448,11 @@ export function ReportView({
                           )}
                         </td>
                       )}
+                      {section === "bill-payments" && column.kind === "status" && (
+                        <td className="px-3 py-2.5 text-center align-middle">
+                          <DisputeCell row={row} dispute={disputes.byTxn.get(row.UniqueId)} onRaise={setDisputeRow} />
+                        </td>
+                      )}
                       </Fragment>
                     ))}
                   </tr>
@@ -1447,6 +1466,7 @@ export function ReportView({
 
       {refreshResult && <RefreshResultDialog result={refreshResult} onClose={() => setRefreshResult(null)} />}
       {actionResult && <TransferActionResultDialog result={actionResult} onClose={() => setActionResult(null)} />}
+      {disputeRow && <RaiseDisputeDialog row={disputeRow} onClose={() => setDisputeRow(null)} onRaised={disputes.reload} />}
       {statusPopup && (
         <TransferStatusDialog
           popup={statusPopup}

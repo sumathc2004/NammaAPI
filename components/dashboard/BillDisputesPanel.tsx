@@ -148,9 +148,14 @@ export function BillDisputesPanel() {
                         <Refs label="Txn" value={v.uniqueId} />
                         <Refs label="Ref" value={v.billPaidRefNo} />
                       </span>
-                      {v.adminRemarks && (
+                      {(v.adminRemarks || v.resolvedAt) && (
                         <p className="mt-1 text-xs text-text-secondary">
-                          <span className="font-semibold text-text-primary">Remarks:</span> {v.adminRemarks}
+                          {v.adminRemarks && (
+                            <>
+                              <span className="font-semibold text-text-primary">Remarks:</span> {v.adminRemarks}
+                            </>
+                          )}
+                          {v.resolvedAt && <span className="ml-2 tabular-nums">· Resolved {formatDate(v.resolvedAt)}</span>}
                         </p>
                       )}
                     </div>

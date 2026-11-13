@@ -8,8 +8,9 @@ const RATE_LIMIT = { limit: 60, windowMs: 10 * 60 * 1000 };
 const STATUSES = new Set(["OPEN", "RESOLVED", "ALL"]);
 
 /**
- * GET /api/dashboard/bill-payments/disputes?status=OPEN|RESOLVED|ALL → vendor bill/getDisputes (every retailer's
- * disputes). The vendor endpoint needs no credentials, so this role check — admins and accountants — is the only gate.
+ * GET /api/dashboard/bill-payments/disputes?status=OPEN|RESOLVED|ALL → vendor bill/getDisputes. Admins and accountants
+ * get every retailer's disputes; any other login gets only its own (`userName` always comes from the session). The
+ * vendor endpoint needs no credentials, so this is the only gate.
  */
 export async function GET(request: Request) {
   const rate = checkRateLimit(`bill-disputes:${getClientIp(request)}`, RATE_LIMIT);
@@ -24,14 +25,11 @@ export async function GET(request: Request) {
   if (!credentials) {
     return NextResponse.json({ error: "Your session has expired. Please log in again." }, { status: 401 });
   }
-  if (adminAccess(credentials) !== "full") {
-    return NextResponse.json({ error: "This is only available to administrators." }, { status: 403 });
-  }
 
   const status = (new URL(request.url).searchParams.get("status") ?? "OPEN").toUpperCase();
   if (!STATUSES.has(status)) return NextResponse.json({ error: "Unknown status." }, { status: 400 });
 
-  const result = await fetchDisputes(status);
+  const result = await fetchDisputes(status, adminAccess(credentials) === "full" ? undefined : credentials.userName);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
   return NextResponse.json({ ok: true, rows: result.rows });
 }
