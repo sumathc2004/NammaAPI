@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchPaymentStatus } from "@/lib/server/aepsDisputes";
 import { getSessionCredentials } from "@/lib/server/session";
-import { adminAccess } from "@/lib/auth/adminAccess";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const RATE_LIMIT = { limit: 120, windowMs: 10 * 60 * 1000 };
@@ -9,7 +8,8 @@ const UNIQUE_ID = /^[A-Za-z0-9_-]{1,60}$/;
 
 /**
  * POST { uniqueId } → vendor bill/getPaymentStatusByRef: the live status of the bill payment behind a dispute.
- * Admins and accountants only (the Disputes tab); the vendor endpoint needs no credentials, so this is the gate.
+ * Any logged-in account (the Bill Payments table's refresh icon, beside Raise dispute). The vendor endpoint needs no
+ * credentials and doesn't check ownership, so the session check and rate limit are the only gates.
  */
 export async function POST(request: Request) {
   const rate = checkRateLimit(`bill-dispute-status:${getClientIp(request)}`, RATE_LIMIT);
@@ -23,9 +23,6 @@ export async function POST(request: Request) {
   const credentials = await getSessionCredentials();
   if (!credentials) {
     return NextResponse.json({ error: "Your session has expired. Please log in again." }, { status: 401 });
-  }
-  if (adminAccess(credentials) !== "full") {
-    return NextResponse.json({ error: "This is only available to administrators." }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => null)) as { uniqueId?: unknown } | null;

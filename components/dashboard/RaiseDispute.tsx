@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { PaymentStatusDialog, type PaymentPopup } from "@/components/dashboard/PaymentStatusDialog";
 import { StatusText, type StatusTone } from "@/components/dashboard/StatusText";
 import { disputeView, isOpenDispute, type DisputeRow, type DisputeView } from "@/lib/admin/disputes";
 import { formatAmount, type ReportRow } from "@/lib/reports/table";
@@ -43,24 +44,63 @@ export function useBillDisputes(enabled: boolean) {
 
 const tone = (status: string): StatusTone => (isOpenDispute(status) ? "pending" : /resolv|clos|done/i.test(status) ? "success" : "neutral");
 
-/** What the Dispute column shows for a bill payment: the dispute's status when there is one, else the Raise button. */
+/**
+ * What the Dispute column shows for a bill payment: the dispute's status when there is one, else the Raise button,
+ * with a round refresh icon beside it that asks the vendor for the payment's live status (bill/getPaymentStatusByRef)
+ * and shows it in a popup. The transaction id is sent to the server but never shown.
+ */
 export function DisputeCell({ row, dispute, onRaise }: { row: ReportRow; dispute: DisputeView | undefined; onRaise: (row: ReportRow) => void }) {
-  if (!row.UniqueId) return null;
-  if (dispute) {
-    return (
-      <StatusText tone={tone(dispute.status)} title={dispute.adminRemarks ? `Remarks: ${dispute.adminRemarks}` : dispute.reason || undefined}>
-        {dispute.status ? `Dispute ${dispute.status.toLowerCase()}` : "Disputed"}
-      </StatusText>
-    );
+  const [popup, setPopup] = useState<PaymentPopup | null>(null);
+  const uniqueId = row.UniqueId;
+  const reference = row.billPaidRefNo ?? "";
+  if (!uniqueId) return null;
+
+  async function check() {
+    setPopup({ status: "pending", reference });
+    try {
+      const response = await fetch("/api/dashboard/bill-payments/disputes/payment-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uniqueId }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.ok && data.payment) setPopup({ status: "ok", reference, payment: data.payment });
+      else setPopup({ status: "error", reference, error: data?.error || "The status could not be checked." });
+    } catch {
+      setPopup({ status: "error", reference, error: "Network error. Check your connection and try again." });
+    }
   }
+
   return (
-    <button
-      type="button"
-      onClick={() => onRaise(row)}
-      className="whitespace-nowrap rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light"
-    >
-      Raise dispute
-    </button>
+    <span className="inline-flex items-center gap-1.5">
+      {dispute ? (
+        <StatusText tone={tone(dispute.status)} title={dispute.adminRemarks ? `Remarks: ${dispute.adminRemarks}` : dispute.reason || undefined}>
+          {dispute.status ? `Dispute ${dispute.status.toLowerCase()}` : "Disputed"}
+        </StatusText>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onRaise(row)}
+          className="whitespace-nowrap rounded-md border border-brand-border px-2 py-1 text-xs font-medium text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light"
+        >
+          Raise dispute
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={check}
+        disabled={popup?.status === "pending"}
+        aria-label="Check the live payment status"
+        title="Check the live payment status"
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-brand-border bg-white text-brand-primary transition-colors hover:border-brand-primary hover:bg-brand-light disabled:opacity-60"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 12a8 8 0 0 1 14.5-4.5M20 12a8 8 0 0 1-14.5 4.5" />
+          <path d="M18 3v5h-5M6 21v-5h5" />
+        </svg>
+      </button>
+      {popup && <PaymentStatusDialog popup={popup} onClose={() => setPopup(null)} />}
+    </span>
   );
 }
 
