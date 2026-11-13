@@ -145,7 +145,6 @@ export function BillDisputesPanel() {
                       </p>
                       {v.reason && <p className="mt-0.5 text-sm text-text-secondary">{v.reason}</p>}
                       <span className="mt-1 flex flex-wrap items-center gap-x-3">
-                        <Refs label="Txn" value={v.uniqueId} />
                         <Refs label="Ref" value={v.billPaidRefNo} />
                       </span>
                       {(v.adminRemarks || v.resolvedAt) && (
@@ -185,7 +184,9 @@ export function BillDisputesPanel() {
                   </div>
                   {expanded && (
                     <dl className="mt-3 grid gap-x-6 gap-y-1 rounded-lg bg-brand-light/50 p-3 text-xs sm:grid-cols-2">
-                      {Object.entries(row).map(([key, value]) => (
+                      {Object.entries(row)
+                        .filter(([key]) => !/^uniqueid$/i.test(key.replace(/[^a-z0-9]/gi, "")))
+                        .map(([key, value]) => (
                         <div key={key} className="flex min-w-0 justify-between gap-3">
                           <dt className="shrink-0 text-text-secondary">{key}</dt>
                           <dd className="min-w-0 truncate text-right font-mono text-text-primary" title={value}>
