@@ -54,8 +54,9 @@ const tone = (status: string): StatusTone => (isOpenDispute(status) ? "pending" 
 export function DisputeCell({ row, dispute, onRaise }: { row: ReportRow; dispute: DisputeView | undefined; onRaise: (row: ReportRow) => void }) {
   const [popup, setPopup] = useState<PaymentPopup | null>(null);
   const profileRaw = useSyncExternalStore(subscribeDemoSession, readDemoSessionRaw, () => undefined);
-  // Only admins and accountants can refund a failed payment (the server checks the session again).
-  const canRefund = hasPageRole(parseDemoSession(profileRaw), "adminOrAccountant");
+  // Admins, accountants and super-access accounts can refund a failed payment (the server checks the session again).
+  const profile = parseDemoSession(profileRaw);
+  const canRefund = hasPageRole(profile, "adminOrAccountant") || hasPageRole(profile, "superAccess");
   const uniqueId = row.UniqueId;
   const reference = row.billPaidRefNo ?? "";
   if (!uniqueId) return null;
